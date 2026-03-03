@@ -1,0 +1,124 @@
+body {
+    background: #202124; /* Warna khas Google Meet */
+    color: white;
+    font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Container Video */
+#videos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 15px;
+    padding: 20px;
+    height: calc(100vh - 100px); /* Sisakan ruang untuk control bar */
+    align-content: center;
+}
+
+video {
+    width: 100%;
+    height: auto;
+    border-radius: 12px;
+    background: #3c4043;
+    object-fit: cover; /* Biar video tidak gepeng */
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+
+/* Control Bar di Bawah */
+#controls {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    background: #202124;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    z-index: 100;
+}
+
+/* Gaya Tombol Bulat */
+.control-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 1px solid #5f6368;
+    background: transparent;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.control-btn:hover {
+    background: #3c4043;
+}
+
+/* Tombol Aktif/Mati (Opsional: bisa diatur via JS nanti) */
+.control-btn.off {
+    background: #ea4335; /* Warna merah */
+    border-color: #ea4335;
+}
+
+/* Tombol Leave Khusus Warna Merah */
+.leave-btn {
+    background: #ea4335;
+    border: none;
+    width: 65px; /* Lebih lebar sedikit seperti Zoom */
+    border-radius: 24px;
+}
+
+.leave-btn:hover {
+    background: #d93025;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+
+#info {
+    position: absolute;
+    top: 10px;
+    left: 20px;
+    font-size: 14px;
+    font-weight: normal;
+    color: #bdc1c6;
+    z-index: 10;
+}
+
+.video-container {
+    position: relative; /* Ini kunci agar status tidak lari ke luar video */
+    width: 100%;
+    background: #3c4043;
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.status {
+    position: absolute;
+    /* Ubah dari top ke bottom */
+    bottom: 15px; 
+    left: 15px;
+    
+    /* Styling agar terlihat profesional */
+    background: rgba(32, 33, 36, 0.75); /* Warna abu gelap transparan khas Meet */
+    color: #e8eaed;
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    z-index: 10;
+    backdrop-filter: blur(8px); /* Efek blur di belakang teks */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
