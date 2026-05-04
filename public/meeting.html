@@ -2,18 +2,20 @@
 <html>
 <head>
     <title>Meeting Room</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
     
     <script src="/socket.io/socket.io.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script> -->
+    <script src="/mediapipe/face_mesh.js"></script>
 </head>
 <body>
     <h3 id="info"></h3>
-    
+    <div id="mainStage"></div>
     <div id="videos"></div>
-
+    <div id="focusNotif" class="focus-notif" style="display: none;"></div>
     <div id="controls">
         <button id="micBtn" class="control-btn" title="Mute/Unmute">
             <i class="fas fa-microphone"></i>

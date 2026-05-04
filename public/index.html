@@ -1,150 +1,90 @@
-<!-- <!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>AI Video Conference</title>
-<script src="/socket.io/socket.io.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-<style>
-body{background:#111;color:white;font-family:Arial}
-#videos{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
-video{width:100%;border-radius:12px;background:black}
-.status{position:absolute;bottom:6px;left:6px;background:#000a;padding:4px 10px;border-radius:20px}
-</style>
-</head>
-<body>
-<h2>AI Focus Video Conference</h2>
-<div id="videos"></div>
-
-<script>
-const socket = io();
-const roomId = 'room1';
-socket.emit('join-room', roomId);
-
-const peers = {};
-const videoGrid = document.getElementById('videos');
-
-navigator.mediaDevices.getUserMedia({video:true,audio:true})
-.then(stream => {
-  addVideo(stream, true);
-
-  socket.on('user-connected', id => connectPeer(id, stream));
-
-  socket.on('signal', async data => {
-    if(!peers[data.from]) createPeer(data.from, stream);
-    await peers[data.from].setRemoteDescription(data.signal);
-
-    if(data.signal.type === 'offer'){
-      const answer = await peers[data.from].createAnswer();
-      await peers[data.from].setLocalDescription(answer);
-      socket.emit('signal',{to:data.from,signal:answer});
-    }
-  });
-});
-
-function createPeer(id, stream){
-  const pc = new RTCPeerConnection();
-  peers[id] = pc;
-
-  stream.getTracks().forEach(t=>pc.addTrack(t,stream));
-
-  pc.ontrack = e => addVideo(e.streams[0]);
-
-  pc.onicecandidate = e => {
-    if(e.candidate){
-      socket.emit('signal',{to:id,signal:e.candidate});
-    }
-  };
-
-  return pc;
-}
-
-async function connectPeer(id, stream){
-  const pc = createPeer(id, stream);
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  socket.emit('signal',{to:id,signal:offer});
-}
-
-function addVideo(stream, local=false){
-  const box = document.createElement('div');
-  box.style.position='relative';
-
-  const video = document.createElement('video');
-  video.srcObject = stream;
-  video.autoplay = true;
-  video.muted = local;
-
-  const status = document.createElement('div');
-  status.className='status';
-  status.innerText='Detecting...';
-
-  box.appendChild(video);
-  box.appendChild(status);
-  videoGrid.appendChild(box);
-
-  if(local) initFocusDetection(video,status);
-}
-
-function initFocusDetection(video,status){
-  const faceMesh = new FaceMesh({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});
-
-  faceMesh.setOptions({maxNumFaces:1,refineLandmarks:true});
-
-  faceMesh.onResults(res=>{
-    if(res.multiFaceLandmarks.length){
-      const lm = res.multiFaceLandmarks[0];
-      const center = (lm[33].x + lm[263].x)/2;
-      const diff = lm[1].x - center;
-
-      if(Math.abs(diff)<0.03){
-        status.innerText='Fokus';
-        status.style.color='#4CAF50';
-      } else {
-        status.innerText='Tidak Fokus';
-        status.style.color='#F44336';
-      }
-    }
-  });
-
-  const cam = new Camera(video,{
-    onFrame: async()=>{await faceMesh.send({image:video});},
-    width:640,height:480
-  });
-
-  cam.start();
-}
-</script>
-</body>
-</html> -->
 <!DOCTYPE html>
 <html>
 <head>
-<title>Lobby</title>
-<link rel="stylesheet" href="style.css">
+    <title>Lobby</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body class="center">
-<div class="card">
-<h2>AI Video Conference</h2>
-<button onclick="createRoom()">Create Room</button>
-<button onclick="joinRoom()">Join Room</button>
-</div>
+    <div class="card">
+        <h2>AI Video Conference</h2>
+        <button onclick="createRoom()">Create Room</button>
+        <button onclick="joinRoom()">Join Room</button>
+    </div>
 
+    <div class="popup-overlay" id="popup">
+        <div class="popup">
+            <h3 id="popupTitle">Enter Details</h3>
+            <input type="text" id="nameInput" placeholder="Your name">
+            <input type="text" id="roomInput" placeholder="Room ID" style="display:none;">
+            <div class="popup-actions">
+                <button onclick="submitPopup()">Continue</button>
+                <button class="secondary" onclick="closePopup()">Cancel</button>
+            </div>
+        </div>
+    </div>
 
-<script>
-function createRoom(){
-const name=prompt('Your name');
-const room=Math.random().toString(36).substr(2,6);
-location.href=`meeting.html?name=${name}&room=${room}`;
-}
+    <script>
+        let mode = ""; // create / join
 
+        function createRoom(){
+            mode = "create";
+            document.getElementById('popupTitle').innerText = "Create Room";
+            document.getElementById('roomInput').style.display = "none";
+            openPopup();
+        }
 
-function joinRoom(){
-const name=prompt('Your name');
-const room=prompt('Room ID');
-location.href=`meeting.html?name=${name}&room=${room}`;
-}
-</script>
+        function joinRoom(){
+            mode = "join";
+            document.getElementById('popupTitle').innerText = "Join Room";
+            document.getElementById('roomInput').style.display = "block";
+            openPopup();
+        }
+
+        function openPopup(){
+            document.getElementById('popup').style.display = "flex";
+            document.getElementById('nameInput').focus();
+        }
+
+        function closePopup(){
+            document.getElementById('popup').style.display = "none";
+        }
+
+        function submitPopup(){
+            const name = document.getElementById('nameInput').value.trim();
+            const roomInput = document.getElementById('roomInput').value.trim();
+
+            if(!name){
+                alert("Name is required");
+                return;
+            }
+
+            let room = roomInput;
+            let role = "participant"; // Default role
+
+            if(mode === "create"){
+                room = Math.random().toString(36).substr(2,6);
+                role = "moderator"; // Pembuat room otomatis jadi moderator
+            }
+
+            if(mode === "join" && !room){
+                alert("Room ID is required");
+                return;
+            }
+
+            // Arahkan ke meeting room beserta role-nya
+            location.href = `meeting.html?name=${name}&room=${room}&role=${role}`;
+        }
+
+        // Enter key support
+        document.addEventListener("keydown", function(e){
+            if(e.key === "Enter"){
+                const popup = document.getElementById('popup');
+                if(popup.style.display === "flex"){
+                    submitPopup();
+                }
+            }
+        });
+    </script>
 </body>
 </html>

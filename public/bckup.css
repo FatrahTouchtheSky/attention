@@ -1,0 +1,407 @@
+body {
+    background: #202124;
+    color: white;
+    font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* =========================
+   KHUSUS HALAMAN LOBBY
+   (Scoped ke .center)
+   ========================= */
+
+.center * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+.center {
+    background: linear-gradient(135deg, #202124, #2d2f33);
+    color: #ffffff;
+    font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.center .card {
+    background: #2b2c2f;
+    padding: 32px 24px;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 360px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+}
+
+.center .card h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.center button {
+    padding: 12px;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.center button:first-of-type {
+    background: #1a73e8;
+    color: white;
+}
+
+.center button:first-of-type:hover {
+    background: #1666c1;
+}
+
+.center button:last-of-type {
+    background: transparent;
+    border: 1px solid #5f6368;
+    color: #e8eaed;
+}
+
+.center button:last-of-type:hover {
+    background: #3c4043;
+}
+
+.center button:active {
+    transform: scale(0.97);
+}
+
+@media (max-width: 480px) {
+    .center .card {
+        padding: 24px 16px;
+        border-radius: 12px;
+    }
+    .center .card h2 {
+        font-size: 1.3rem;
+    }
+    .center button {
+        font-size: 0.95rem;
+        padding: 10px;
+    }
+}
+
+/* POPUP OVERLAY */
+.center .popup-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+}
+
+.center .popup {
+    background: #2b2c2f;
+    padding: 24px;
+    border-radius: 14px;
+    width: 90%;
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+}
+
+.center .popup h3 {
+    font-size: 1.2rem;
+    text-align: center;
+}
+
+.center .popup input {
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #5f6368;
+    background: #202124;
+    color: white;
+    font-size: 0.95rem;
+}
+
+.center .popup-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.center .popup-actions button {
+    flex: 1;
+}
+
+.center .popup-actions .secondary {
+    background: transparent;
+    border: 1px solid #5f6368;
+}
+
+/* =========================meet page======================== */
+/* Layout Default */
+#videos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 15px;
+    padding: 20px;
+    height: calc(100vh - 100px);
+    align-content: center;
+}
+
+/* Layout Saat Share Screen Aktif */
+body.sharing-active #videos {
+    grid-template-columns: 3fr 1fr; /* Kiri besar, kanan sidebar */
+    grid-template-areas: "presentation sidebar";
+}
+
+.presentation-container {
+    grid-area: presentation;
+    height: 80vh;
+    background: #000;
+    border-radius: 12px;
+    position: relative;
+}
+
+.presentation-container video {
+    object-fit: contain; /* Layar tidak terpotong */
+}
+
+/* Semua video peserta selain layar akan pindah ke sidebar */
+body.sharing-active .video-container {
+    grid-column: 2; /* Paksa ke kolom kedua (kanan) */
+    height: 180px;
+}
+/* #videos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 15px;
+    padding: 20px;
+    height: calc(100vh - 100px); 
+    align-content: center;
+} */
+
+video {
+    width: 100%;
+    height: auto;
+    border-radius: 12px;
+    background: #3c4043;
+    object-fit: cover; 
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+
+#controls {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    background: #202124;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    z-index: 100;
+}
+
+.control-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 1px solid #5f6368;
+    background: transparent;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.control-btn:hover {
+    background: #3c4043;
+}
+
+.control-btn.off {
+    background: #ea4335; 
+    border-color: #ea4335;
+}
+
+.leave-btn {
+    background: #ea4335;
+    border: none;
+    width: 65px; 
+    border-radius: 24px;
+}
+
+.leave-btn:hover {
+    background: #d93025;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+
+#info {
+    position: absolute;
+    top: 10px;
+    left: 20px;
+    font-size: 14px;
+    font-weight: normal;
+    color: #bdc1c6;
+    z-index: 10;
+}
+
+.video-container {
+    position: relative; 
+    width: 100%;
+    background: #3c4043;
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.status {
+    position: absolute;
+    bottom: 15px; 
+    left: 15px;
+    background: rgba(32, 33, 36, 0.75); 
+    color: #e8eaed;
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    z-index: 10;
+    backdrop-filter: blur(8px); 
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* =========================
+   NOTIFIKASI MODERATOR
+   ========================= */
+.focus-notif {
+    position: fixed;
+    bottom: 100px;
+    right: 20px;
+    background: rgba(234, 67, 53, 0.9);
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    z-index: 200;
+    font-size: 14px;
+    line-height: 1.5;
+    max-width: 280px;
+    backdrop-filter: blur(4px);
+    border: 1px solid #f28b82;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* =========================
+   RESPONSIVE DESIGN (MOBILE)
+   Khusus Halaman Meeting
+   ========================= */
+@media (max-width: 768px) {
+    /* 1. Sesuaikan Grid Video */
+    #videos {
+        /* Ubah minmax dari 320px menjadi 140px agar muat 2 video bersebelahan atau menumpuk rapi */
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 10px;
+        padding: 10px;
+        height: calc(100vh - 70px); /* Sesuaikan dengan tinggi control bar yang baru */
+    }
+
+    /* 2. Sesuaikan Control Bar di Bawah */
+    #controls {
+        height: 70px;
+        gap: 10px;
+    }
+
+    /* Kecilkan ukuran tombol kontrol */
+    .control-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 16px;
+    }
+
+    /* Sesuaikan tombol leave */
+    .leave-btn {
+        width: 55px;
+    }
+
+    /* 3. Rapikan Teks Info (Kiri Atas) */
+    #info {
+        font-size: 12px;
+        top: 10px;
+        left: 10px;
+        /* Tambahkan background gelap transparan agar teks terbaca meski menumpuk di atas video */
+        background: rgba(0, 0, 0, 0.5);
+        padding: 4px 8px;
+        border-radius: 6px;
+    }
+
+    /* 4. Sesuaikan Label Status AI */
+    .status {
+        font-size: 11px;
+        padding: 3px 8px;
+        bottom: 10px;
+        left: 10px;
+    }
+
+    /* 5. Sesuaikan Notifikasi Moderator */
+    .focus-notif {
+        bottom: 80px; /* Turunkan posisinya mendekati control bar */
+        right: 10px;
+        left: 10px; /* Tarik dari kiri dan kanan agar memenuhi lebar layar HP */
+        max-width: calc(100% - 20px); /* Full width dikurangi margin */
+        font-size: 13px;
+    }
+}
+/* Saat ada yang sharing, body akan mendapatkan class ini via JS */
+body.sharing-active #videos {
+    display: grid;
+    grid-template-columns: 3fr 1fr; /* 3 bagian untuk layar, 1 bagian untuk peserta */
+    grid-template-areas: "presentation sidebar";
+    height: calc(100vh - 100px);
+}
+
+/* Kotak Presentasi Besar */
+.presentation-container {
+    grid-area: presentation;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* Sidebar Peserta saat sharing */
+body.sharing-active .video-sidebar {
+    grid-area: sidebar;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    gap: 10px;
+}
+
+/* Video di sidebar diperkecil */
+body.sharing-active .video-container {
+    min-width: 100% !important;
+    height: 150px;
+}
