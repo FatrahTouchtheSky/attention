@@ -1,22 +1,26 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Meeting Room</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style.css">
-    
+    <link rel="stylesheet" href="/style.css?v=3">
+
     <script src="/socket.io/socket.io.js"></script>
     <!-- <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script> -->
     <script src="/mediapipe/face_mesh.js"></script>
 </head>
+
 <body>
-    <h3 id="info"></h3>
+    <!-- <div id="fpsCounter" class="fps-counter">FPS: 0</div> -->
     <div id="mainStage"></div>
     <div id="videos"></div>
     <div id="focusNotif" class="focus-notif" style="display: none;"></div>
+    <div id="toastNotif" class="toast-notif" style="display: none;"></div>
     <div id="controls">
+        <h3 id="info"></h3>
         <button id="micBtn" class="control-btn" title="Mute/Unmute">
             <i class="fas fa-microphone"></i>
         </button>
@@ -26,11 +30,64 @@
         <button id="shareBtn" class="control-btn" title="Share Screen">
             <i class="fas fa-desktop"></i>
         </button>
+        <div style="position: relative;">
+            <button id="moreOptionsBtn" class="control-btn" title="More Options">
+                <i class="fas fa-ellipsis-v"></i>
+            </button>
+            <div id="optionsMenu" class="options-menu">
+                <button id="participantsBtnMenu" class="menu-item"><i class="fas fa-user-friends"></i>
+                    Participants</button>
+                <button id="summaryBtnMenu" class="menu-item moderator-only" style="display: none;"><i
+                        class="fas fa-chart-bar"></i> Attention Summary</button>
+            </div>
+        </div>
         <button id="leaveBtn" class="control-btn leave-btn" title="End Call">
             <i class="fas fa-phone-slash"></i>
         </button>
     </div>
 
-    <script src="meeting.js"></script>
+    <!-- Participants Sidebar -->
+    <div id="participantsSidebar" class="sidebar">
+        <div class="sidebar-header">
+            <h3 id="participantsCount">Participants (0)</h3>
+            <div class="header-actions">
+                <button class="icon-btn" title="Pop out"><i class="fas fa-external-link-alt"></i></button>
+                <button class="icon-btn" id="closeSidebarBtn" title="Close"><i class="fas fa-times"></i></button>
+            </div>
+        </div>
+        <div class="sidebar-search">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" id="participantSearch" placeholder="Find a participant">
+        </div>
+        <div id="participantsList" class="participants-list">
+            <!-- List goes here -->
+        </div>
+    </div>
+
+    <!-- Paginasi Button -->
+    <button id="prevPageBtn" class="page-btn" style="display: none;" title="Previous Page">
+        <i class="fas fa-chevron-left"></i>
+    </button>
+    <button id="nextPageBtn" class="page-btn" style="display: none;" title="Next Page">
+        <i class="fas fa-chevron-right"></i>
+    </button>
+
+    <!-- Summary Sidebar -->
+    <div id="summarySidebar" class="sidebar">
+        <div class="sidebar-header">
+            <h3>Attention Summary</h3>
+            <div class="header-actions">
+                <button class="icon-btn" id="downloadSummaryBtn" title="Download CSV"><i
+                        class="fas fa-download"></i></button>
+                <button class="icon-btn" id="closeSummarySidebarBtn" title="Close"><i class="fas fa-times"></i></button>
+            </div>
+        </div>
+        <div id="summaryList" class="participants-list">
+            <!-- Data disuntikkan dari meeting.js -->
+        </div>
+    </div>
+
+    <script src="/meeting.js?v=3"></script>
 </body>
+
 </html>

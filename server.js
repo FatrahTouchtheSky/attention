@@ -153,13 +153,119 @@
 // });
 
 // =============================================|| chatgpt ||===============================================
+// const express = require('express');
+// const http    = require('http');
+// const { Server } = require('socket.io');
+
+// const app    = express();
+// const server = http.createServer(app);
+// const io     = new Server(server);
+
+// app.use(express.static('public'));
+
+// // ✅ ICE Config dengan TURN server Metered.ca
+// app.get('/ice-config', (req, res) => {
+//   res.json({
+//     iceServers: [
+//       {
+//         urls: 'stun:stun.relay.metered.ca:80',
+//       },
+//       {
+//         urls: 'turn:global.relay.metered.ca:80',
+//         username: 'b7b561628253fd215c181d66',
+//         credential: 'KbQoLAgD9L32PWFd',
+//       },
+//       {
+//         urls: 'turn:global.relay.metered.ca:80?transport=tcp',
+//         username: 'b7b561628253fd215c181d66',
+//         credential: 'KbQoLAgD9L32PWFd',
+//       },
+//       {
+//         urls: 'turn:global.relay.metered.ca:443',
+//         username: 'b7b561628253fd215c181d66',
+//         credential: 'KbQoLAgD9L32PWFd',
+//       },
+//       {
+//         urls: 'turns:global.relay.metered.ca:443?transport=tcp',
+//         username: 'b7b561628253fd215c181d66',
+//         credential: 'KbQoLAgD9L32PWFd',
+//       },
+//     ]
+//   });
+// });
+
+// // =============================================
+// // SOCKET.IO
+// // =============================================
+// io.on('connection', socket => {
+//   let currentRoom = null;
+
+//   socket.on('join-room', room => {
+//     currentRoom = room;
+//     socket.join(room);
+
+//     const clients = [...(io.sockets.adapter.rooms.get(room) || [])];
+//     const others  = clients.filter(id => id !== socket.id);
+
+//     socket.emit('all-users', others);
+//     socket.to(room).emit('user-connected', socket.id);
+
+//     // ✅ FIX Detecting: kirim status terkini ke pendatang baru
+//     const statuses = [];
+//     others.forEach(id => {
+//       const s = io.sockets.sockets.get(id);
+//       if (s?.lastStatus) {
+//         statuses.push({ id, ...s.lastStatus });
+//       }
+//     });
+//     if (statuses.length > 0) {
+//       socket.emit('current-statuses', statuses);
+//     }
+//   });
+
+//   socket.on('signal', ({ to, signal }) => {
+//     io.to(to).emit('signal', { from: socket.id, signal });
+//   });
+
+//   socket.on('update-focus', data => {
+//     socket.lastStatus = { status: data.status, name: data.name };
+//     if (currentRoom) {
+//       socket.to(currentRoom).emit('user-focus-changed', {
+//         id:     socket.id,
+//         status: data.status,
+//         name:   data.name
+//       });
+//     }
+//   });
+
+//   socket.on('screen-share-start', () => {
+//     if (currentRoom) socket.to(currentRoom).emit('screen-share-started', socket.id);
+//   });
+
+//   socket.on('screen-share-stop', () => {
+//     if (currentRoom) socket.to(currentRoom).emit('screen-share-stopped', socket.id);
+//   });
+
+//   socket.on('disconnect', () => {
+//     if (currentRoom) socket.to(currentRoom).emit('user-disconnected', socket.id);
+//   });
+// });
+
+// const PORT = process.env.PORT || 3000;
+// server.listen(PORT, () => console.log(`Running on port ${PORT}`));
+
+// =============================================|| chatgpt ||===============================================
+require('dotenv').config();
 const express = require('express');
 const http    = require('http');
 const { Server } = require('socket.io');
 
 const app    = express();
 const server = http.createServer(app);
-const io     = new Server(server);
+const io     = new Server(server, {
+  pingTimeout: 10000,
+  pingInterval: 5000
+});
 
 app.use(express.static('public'));
 
@@ -168,35 +274,94 @@ app.get('/ice-config', (req, res) => {
   res.json({
     iceServers: [
       {
+        urls: 'stun:stun.l.google.com:19302',
+      },
+      {
         urls: 'stun:stun.relay.metered.ca:80',
       },
       {
         urls: 'turn:global.relay.metered.ca:80',
-        username: 'b7b561628253fd215c181d66',
-        credential: 'KbQoLAgD9L32PWFd',
+        username: process.env.TURN_USERNAME,
+        credential: process.env.TURN_CREDENTIAL,
       },
       {
         urls: 'turn:global.relay.metered.ca:80?transport=tcp',
-        username: 'b7b561628253fd215c181d66',
-        credential: 'KbQoLAgD9L32PWFd',
+        username: process.env.TURN_USERNAME,
+        credential: process.env.TURN_CREDENTIAL,
       },
       {
         urls: 'turn:global.relay.metered.ca:443',
-        username: 'b7b561628253fd215c181d66',
-        credential: 'KbQoLAgD9L32PWFd',
+        username: process.env.TURN_USERNAME,
+        credential: process.env.TURN_CREDENTIAL,
       },
       {
         urls: 'turns:global.relay.metered.ca:443?transport=tcp',
-        username: 'b7b561628253fd215c181d66',
-        credential: 'KbQoLAgD9L32PWFd',
+        username: process.env.TURN_USERNAME,
+        credential: process.env.TURN_CREDENTIAL,
       },
     ]
   });
 });
 
+// ✅ Cek apakah room sudah dibuat (ada partisipan)
+app.get('/check-room', (req, res) => {
+  const room = req.query.room;
+  if (!room) {
+    return res.json({ exists: false });
+  }
+  // Cek apakah room ada di dalam list adapter (berarti sudah ada yang join/create)
+  const roomExists = io.sockets.adapter.rooms.has(room);
+  res.json({ exists: roomExists });
+});
+
+
+
+
 // =============================================
-// SOCKET.IO
+// SOCKET.IO & TRACKING
 // =============================================
+const roomFocusStats = {};
+const roomScreenShare = {}; // Tracks active screen share in each room: roomId -> sharingSocketId
+
+app.get('/room-summary', (req, res) => {
+  const room = req.query.room;
+  if (!room || !roomFocusStats[room]) {
+    return res.json({ success: false, data: null });
+  }
+  
+  const now = Date.now();
+  const summaryData = {};
+  for (const socketId in roomFocusStats[room]) {
+    const stats = roomFocusStats[room][socketId];
+    const elapsed = now - stats.lastUpdateTime;
+    
+    let finalFocusedTime = stats.focusedTime;
+    let finalTotalTime = stats.totalTime + elapsed;
+    
+    if (stats.lastStatus === 'Memperhatikan') {
+      finalFocusedTime += elapsed;
+    }
+    
+    summaryData[socketId] = {
+      name: stats.name,
+      total: finalTotalTime,
+      focused: finalFocusedTime
+    };
+  }
+
+  res.json({ success: true, data: summaryData });
+});
+
+// ✅ Route untuk clean URL room (misal: /abc-defg-hij atau /raqmiz)
+app.get('/:room', (req, res, next) => {
+  const room = req.params.room;
+  // Jika path mengandung titik (seperti style.css, meeting.js), biarkan static middleware yang menangani
+  if (room.includes('.')) {
+    return next();
+  }
+  res.sendFile(__dirname + '/public/meeting.html');
+});
+
 io.on('connection', socket => {
   let currentRoom = null;
 
@@ -210,16 +375,48 @@ io.on('connection', socket => {
     socket.emit('all-users', others);
     socket.to(room).emit('user-connected', socket.id);
 
-    // ✅ FIX Detecting: kirim status terkini ke pendatang baru
+    // Kirim status screen share aktif jika ada
+    const currentSharer = roomScreenShare[room];
+    if (currentSharer) {
+      socket.emit('screen-share-started', currentSharer);
+    }
+
+    // Kirim nama dan role semua user yang sudah ada ke pendatang baru
+    const names = [];
+    others.forEach(id => {
+      const s = io.sockets.sockets.get(id);
+      if (s?.userName) names.push({ id, name: s.userName, role: s.userRole });
+    });
+    if (names.length > 0) socket.emit('peer-names', names);
+
+    // Kirim status fokus terkini ke pendatang baru
     const statuses = [];
     others.forEach(id => {
       const s = io.sockets.sockets.get(id);
-      if (s?.lastStatus) {
-        statuses.push({ id, ...s.lastStatus });
-      }
+      if (s?.lastStatus) statuses.push({ id, ...s.lastStatus });
     });
-    if (statuses.length > 0) {
-      socket.emit('current-statuses', statuses);
+    if (statuses.length > 0) socket.emit('current-statuses', statuses);
+
+    // Kirim status mic/cam terkini ke pendatang baru
+    const mediaStatuses = [];
+    others.forEach(id => {
+      const s = io.sockets.sockets.get(id);
+      if (s?.mediaStatus) mediaStatuses.push({ id, ...s.mediaStatus });
+    });
+    if (mediaStatuses.length > 0) socket.emit('current-media-statuses', mediaStatuses);
+  });
+
+  socket.on('set-name', data => {
+    socket.userName = data.name;
+    socket.userRole = data.role || 'participant';
+    socket.userId = data.userId;
+    if (currentRoom) {
+      // Jika userId sudah memiliki data focus statistik sebelumnya,
+      // perbarui lastUpdateTime agar reload gap tidak merusak totalTime.
+      if (roomFocusStats[currentRoom] && roomFocusStats[currentRoom][data.userId]) {
+        roomFocusStats[currentRoom][data.userId].lastUpdateTime = Date.now();
+      }
+      socket.to(currentRoom).emit('peer-name', { id: socket.id, name: data.name, role: socket.userRole });
     }
   });
 
@@ -230,6 +427,33 @@ io.on('connection', socket => {
   socket.on('update-focus', data => {
     socket.lastStatus = { status: data.status, name: data.name };
     if (currentRoom) {
+      // TRACKING LOGIC (Lightweight Time Counter)
+      const userId = socket.userId || socket.id;
+      const now = Date.now();
+      if (!roomFocusStats[currentRoom]) {
+        roomFocusStats[currentRoom] = {};
+      }
+      if (!roomFocusStats[currentRoom][userId]) {
+        roomFocusStats[currentRoom][userId] = { 
+          name: data.name, 
+          focusedTime: 0, 
+          totalTime: 0,
+          lastStatus: data.status,
+          lastUpdateTime: now
+        };
+      }
+      const stats = roomFocusStats[currentRoom][userId];
+      if (data.name) stats.name = data.name;
+      
+      const elapsed = now - stats.lastUpdateTime;
+      stats.totalTime += elapsed;
+      if (stats.lastStatus === 'Memperhatikan') {
+        stats.focusedTime += elapsed;
+      }
+      
+      stats.lastStatus = data.status;
+      stats.lastUpdateTime = now;
+
       socket.to(currentRoom).emit('user-focus-changed', {
         id:     socket.id,
         status: data.status,
@@ -238,16 +462,49 @@ io.on('connection', socket => {
     }
   });
 
+  socket.on('media-status', data => {
+    socket.mediaStatus = { mic: data.mic, cam: data.cam };
+    if (currentRoom) {
+      socket.to(currentRoom).emit('media-status-changed', {
+        id: socket.id,
+        mic: data.mic,
+        cam: data.cam
+      });
+    }
+  });
+
   socket.on('screen-share-start', () => {
-    if (currentRoom) socket.to(currentRoom).emit('screen-share-started', socket.id);
+    if (currentRoom) {
+      roomScreenShare[currentRoom] = socket.id;
+      socket.to(currentRoom).emit('screen-share-started', socket.id);
+    }
   });
 
   socket.on('screen-share-stop', () => {
-    if (currentRoom) socket.to(currentRoom).emit('screen-share-stopped', socket.id);
+    if (currentRoom) {
+      if (roomScreenShare[currentRoom] === socket.id) {
+        delete roomScreenShare[currentRoom];
+      }
+      socket.to(currentRoom).emit('screen-share-stopped', socket.id);
+    }
   });
 
   socket.on('disconnect', () => {
-    if (currentRoom) socket.to(currentRoom).emit('user-disconnected', socket.id);
+    if (currentRoom) {
+      socket.to(currentRoom).emit('user-disconnected', socket.id);
+      
+      // Hapus status screen share jika yang menshare disconnect
+      if (roomScreenShare[currentRoom] === socket.id) {
+        delete roomScreenShare[currentRoom];
+      }
+
+      // Bersihkan memory jika ruangan kosong
+      const clients = io.sockets.adapter.rooms.get(currentRoom);
+      if (!clients || clients.size === 0) {
+        delete roomFocusStats[currentRoom];
+        delete roomScreenShare[currentRoom];
+      }
+    }
   });
 });
 
