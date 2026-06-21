@@ -297,9 +297,9 @@ if (role === 'moderator' && summaryBtnMenu) {
           item.className = 'participant-item';
 
           let color = '#ea4335';
-          let statusText = 'Poor';
-          if (focusPercent >= 80) { color = '#34a853'; statusText = 'Excellent'; }
-          else if (focusPercent >= 50) { color = '#fbbc04'; statusText = 'Fair'; }
+          let statusText = 'Kurang';
+          if (focusPercent >= 80) { color = '#34a853'; statusText = 'Baik'; }
+          else if (focusPercent >= 50) { color = '#fbbc04'; statusText = 'Cukup'; }
 
           const initial = (userStat.name || '?').charAt(0).toUpperCase();
 
