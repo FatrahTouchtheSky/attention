@@ -137,7 +137,7 @@ shareBtn.onclick = async () => {
         },
         audio: true
       };
-      
+
       try {
         screenStream = await navigator.mediaDevices.getDisplayMedia(displayConstraints);
       } catch (err) {
@@ -1285,7 +1285,7 @@ function updateNotifUI() {
   const users = Object.values(unfocusedUsers);
   if (users.length) {
     box.style.display = 'block';
-    box.innerHTML = `<strong><i class="fas fa-exclamation-triangle"></i>${users.join(', ')} tidak memperhatikan.</strong>`;
+    box.innerHTML = `<strong><i class="fas fa-exclamation-triangle"></i> ${users.join(', ')} tidak memperhatikan.</strong>`;
   } else {
     box.style.display = 'none';
   }
