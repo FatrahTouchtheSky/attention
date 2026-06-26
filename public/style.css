@@ -1168,19 +1168,65 @@ body.sidebar-open #controls {
     }
 }
 
-.fps-counter {
+.monitor-panel {
     position: fixed;
     top: 15px;
     right: 20px;
-    background: rgba(32, 33, 36, 0.6);
+    background: rgba(20, 20, 22, 0.85);
     color: #e8eaed;
-    padding: 6px 12px;
-    border-radius: 8px;
-    font-size: 14px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    font-size: 13px;
     font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
     font-weight: 500;
     z-index: 1000;
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 145px;
+    pointer-events: none;
+}
+
+.monitor-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.monitor-item i {
+    width: 16px;
+    opacity: 0.8;
+}
+
+.monitor-item span:nth-child(2) {
+    font-family: monospace;
+    font-weight: 600;
+}
+
+.camera-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.camera-select-dropdown {
+    background: transparent;
+    color: #e8eaed;
+    border: none;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    cursor: pointer;
+    width: calc(100% - 26px);
+    text-overflow: ellipsis;
+    padding: 0;
+}
+
+.camera-select-dropdown option {
+    background: #202124;
+    color: #e8eaed;
 }

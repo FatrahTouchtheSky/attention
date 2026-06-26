@@ -501,6 +501,7 @@ async function initMedia() {
       }
     });
     addVideo(localStream, true);
+    getCameraDevices();
     socket.emit('join-room', room, name);
     socket.emit('set-name', { name, role, userId });
     updateParticipantsList();
@@ -1310,19 +1311,22 @@ function showToast(msg) {
 }
 
 /* =================================================
-   FPS COUNTER
+   REAL-TIME MONITORING PANEL (FPS, Latency, CPU, RAM)
 ================================================= */
 let lastFrameTime = performance.now();
 let frameCount = 0;
-const fpsCounter = document.getElementById('fpsCounter');
+const valFPS = document.getElementById('valFPS');
+const valLatency = document.getElementById('valLatency');
+const valCPU = document.getElementById('valCPU');
+const valRAM = document.getElementById('valRAM');
 
 function measureFPS() {
   const now = performance.now();
   frameCount++;
   if (now >= lastFrameTime + 1000) {
     const fps = Math.round((frameCount * 1000) / (now - lastFrameTime));
-    if (fpsCounter) {
-      fpsCounter.innerText = `FPS: ${fps}`;
+    if (valFPS) {
+      valFPS.innerText = fps;
     }
     frameCount = 0;
     lastFrameTime = now;
@@ -1330,3 +1334,154 @@ function measureFPS() {
   requestAnimationFrame(measureFPS);
 }
 measureFPS();
+
+// Ping-pong latency and server metrics monitoring
+setInterval(() => {
+  const start = Date.now();
+  socket.emit('ping-rtt', (data) => {
+    const duration = Date.now() - start;
+    if (valLatency) {
+      valLatency.innerText = `${duration} ms`;
+    }
+    if (data) {
+      if (valCPU) valCPU.innerText = `${data.cpu}%`;
+      if (valRAM) valRAM.innerText = `${data.ram} MB`;
+    }
+  });
+}, 2000);
+
+/* =================================================
+   WEBCAM ENUMERATION & SWITCHING
+================================================= */
+async function getCameraDevices() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoDevices = devices.filter(d => d.kind === 'videoinput');
+    
+    const select = document.getElementById('cameraSelect');
+    if (!select) return;
+    
+    select.innerHTML = '';
+    videoDevices.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.deviceId;
+      opt.text = d.label || `Kamera ${select.length + 1}`;
+      select.appendChild(opt);
+    });
+
+    // Cari track kamera aktif saat ini untuk menyesuaikan pilihan dropdown
+    const currentTrack = localStream?.getVideoTracks()[0];
+    if (currentTrack) {
+      const settings = currentTrack.getSettings();
+      if (settings && settings.deviceId) {
+        select.value = settings.deviceId;
+      }
+    }
+
+    const container = document.getElementById('cameraSelectContainer');
+    if (videoDevices.length > 1) {
+      if (container) {
+        container.style.display = 'flex';
+      } else {
+        select.style.display = 'inline-block';
+      }
+    } else {
+      if (container) {
+        container.style.display = 'none';
+      } else {
+        select.style.display = 'none';
+      }
+    }
+  } catch (e) {
+    console.error("Gagal mendapatkan daftar kamera", e);
+  }
+}
+
+async function switchCamera(deviceId) {
+  if (!localStream) return;
+  
+  // 1. Dapatkan dan HENTIKAN track kamera lama terlebih dahulu untuk membebaskan hardware lock
+  const oldVideoTrack = localStream.getVideoTracks()[0];
+  if (oldVideoTrack) {
+    oldVideoTrack.stop();
+    localStream.removeTrack(oldVideoTrack);
+  }
+  
+  try {
+    // 2. Minta akses kamera yang baru
+    const newStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        deviceId: { exact: deviceId }
+      }
+    });
+    
+    const newVideoTrack = newStream.getVideoTracks()[0];
+    localStream.addTrack(newVideoTrack);
+    
+    // Perbarui sumber video box lokal di DOM
+    const localBox = allVideoBoxes.find(b => b.id === 'local')?.element;
+    if (localBox) {
+      const vid = localBox.querySelector('video');
+      if (vid) {
+        vid.srcObject = null;
+        vid.srcObject = localStream;
+        vid.play().catch(console.error);
+      }
+    }
+    
+    // Perbarui track pada semua peer connection yang aktif
+    if (!screenStream) {
+      for (let id in peers) {
+        const pc = peers[id].pc;
+        const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+        if (sender) {
+          await sender.replaceTrack(newVideoTrack);
+        }
+      }
+    }
+    
+    // Pastikan tombol kamera sinkron dalam keadaan aktif
+    const isCamOn = newVideoTrack.enabled;
+    camBtn.querySelector('i').className = isCamOn ? 'fas fa-video' : 'fas fa-video-slash';
+    camBtn.classList.toggle('off', !isCamOn);
+    
+    // Kirim pembaruan status media ke server
+    socket.emit('media-status', {
+      mic: localStream.getAudioTracks()[0]?.enabled,
+      cam: isCamOn
+    });
+    
+  } catch (err) {
+    console.error("Gagal beralih kamera:", err);
+    alert("Gagal mengakses kamera yang dipilih: " + err.message);
+    
+    // Fallback: Jika gagal beralih, kembalikan ke kamera default agar tidak blank
+    try {
+      const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const fallbackTrack = fallbackStream.getVideoTracks()[0];
+      localStream.addTrack(fallbackTrack);
+      
+      const localBox = allVideoBoxes.find(b => b.id === 'local')?.element;
+      if (localBox) {
+        const vid = localBox.querySelector('video');
+        if (vid) {
+          vid.srcObject = null;
+          vid.srcObject = localStream;
+          vid.play().catch(console.error);
+        }
+      }
+    } catch (fallbackErr) {
+      console.error("Gagal melakukan fallback kamera:", fallbackErr);
+    }
+  }
+}
+
+// Event listener untuk perubahan input select kamera
+document.getElementById('cameraSelect')?.addEventListener('change', (e) => {
+  switchCamera(e.target.value);
+});
+
+// Otomatis memperbarui dropdown jika ada perangkat kamera baru yang dicolok/dicabut
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+  navigator.mediaDevices.addEventListener('devicechange', getCameraDevices);
+}

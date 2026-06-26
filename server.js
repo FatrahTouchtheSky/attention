@@ -259,6 +259,7 @@ require('dotenv').config();
 const express = require('express');
 const http    = require('http');
 const { Server } = require('socket.io');
+const os      = require('os');
 
 const app    = express();
 const server = http.createServer(app);
@@ -323,6 +324,40 @@ app.get('/check-room', (req, res) => {
 const roomFocusStats = {};
 const roomScreenShare = {}; // Tracks active screen share in each room: roomId -> sharingSocketId
 
+// --- SERVER SYSTEM MONITORING (CPU & RAM) ---
+let serverCpuUsage = 0;
+let lastCpuInfo = getCPUInfo();
+
+// Periodically update server CPU usage
+setInterval(() => {
+  const currentCpuInfo = getCPUInfo();
+  const idleDiff = currentCpuInfo.idle - lastCpuInfo.idle;
+  const totalDiff = currentCpuInfo.total - lastCpuInfo.total;
+  serverCpuUsage = totalDiff > 0 ? 100 - Math.round((100 * idleDiff) / totalDiff) : 0;
+  lastCpuInfo = currentCpuInfo;
+}, 1000);
+
+function getCPUInfo() {
+  const cpus = os.cpus();
+  let idle = 0;
+  let total = 0;
+  if (!cpus) return { idle: 0, total: 1 };
+  for (const cpu of cpus) {
+    for (const type in cpu.times) {
+      total += cpu.times[type];
+    }
+    idle += cpu.times.idle;
+  }
+  return { idle, total };
+}
+
+function getServerRamUsage() {
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+  const usedMem = totalMem - freeMem;
+  return Math.round(usedMem / 1024 / 1024);
+}
+
 app.get('/room-summary', (req, res) => {
   const room = req.query.room;
   if (!room || !roomFocusStats[room]) {
@@ -364,6 +399,15 @@ app.get('/:room', (req, res, next) => {
 
 io.on('connection', socket => {
   let currentRoom = null;
+
+  socket.on('ping-rtt', (callback) => {
+    if (typeof callback === 'function') {
+      callback({
+        cpu: serverCpuUsage,
+        ram: getServerRamUsage()
+      });
+    }
+  });
 
   socket.on('join-room', room => {
     currentRoom = room;

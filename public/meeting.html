@@ -14,7 +14,25 @@
 </head>
 
 <body>
-    <!-- <div id="fpsCounter" class="fps-counter">FPS: 0</div> -->
+    <!-- Real-time Monitoring Panel -->
+    <!-- <div id="monitorPanel" class="monitor-panel">
+        <div class="monitor-item">
+            <span><i class="fas fa-tachometer-alt"></i> FPS</span>
+            <span id="valFPS">0</span>
+        </div>
+        <div class="monitor-item">
+            <span><i class="fas fa-network-wired"></i> Latency</span>
+            <span id="valLatency">0 ms</span>
+        </div>
+        <div class="monitor-item">
+            <span><i class="fas fa-microchip"></i> CPU</span>
+            <span id="valCPU">0%</span>
+        </div>
+        <div class="monitor-item">
+            <span><i class="fas fa-memory"></i> RAM</span>
+            <span id="valRAM">0 MB</span>
+        </div>
+    </div> -->
     <div id="mainStage"></div>
     <div id="videos"></div>
     <div id="focusNotif" class="focus-notif" style="display: none;"></div>
@@ -35,6 +53,10 @@
                 <i class="fas fa-ellipsis-v"></i>
             </button>
             <div id="optionsMenu" class="options-menu">
+                <div id="cameraSelectContainer" class="menu-item camera-menu-item" style="display: none;">
+                    <i class="fas fa-camera"></i>
+                    <select id="cameraSelect" class="camera-select-dropdown" title="Pilih Kamera"></select>
+                </div>
                 <button id="participantsBtnMenu" class="menu-item"><i class="fas fa-user-friends"></i>
                     Participants</button>
                 <button id="summaryBtnMenu" class="menu-item moderator-only" style="display: none;"><i
