@@ -77,10 +77,31 @@ let currentSharingPeerId = null;
 const peerStreamType = {};
 const peerNames = {};  // peerId -> nama peserta
 const peerRoles = {};  // peerId -> role peserta
+const peerStatuses = {}; // peerId -> status fokus peserta
 const peerMediaStatus = {}; // peerId -> { mic: boolean, cam: boolean }
 
 let allVideoBoxes = [];
 let currentPage = 1;
+
+// Play video element securely (preventing autoplay blockages)
+function playVideoElement(video) {
+  video.play().catch(err => {
+    console.warn("[Autoplay] Play failed, trying muted:", err.message);
+    video.muted = true;
+    video.play().catch(err2 => console.error("[Autoplay] Muted play also failed:", err2));
+    
+    // Unmute on first user interaction
+    const unmute = () => {
+      video.muted = false;
+      video.play().catch(e => {
+        console.warn("[Autoplay] Failed to unmute video:", e.message);
+        video.muted = true; // fallback to muted if still not allowed
+      });
+      ['click', 'touchstart', 'keydown'].forEach(evt => document.removeEventListener(evt, unmute));
+    };
+    ['click', 'touchstart', 'keydown'].forEach(evt => document.addEventListener(evt, unmute));
+  });
+}
 
 const NOTIF_DELAY_MS = 5000;
 
@@ -104,6 +125,7 @@ camBtn.onclick = () => {
     mic: localStream.getAudioTracks()[0]?.enabled,
     cam: track.enabled
   });
+  updateLocalResolution();
 };
 
 micBtn.onclick = () => {
@@ -259,6 +281,178 @@ document.addEventListener('click', (e) => {
     optionsMenu.classList.remove('show');
   }
 });
+
+/* =================================================
+   PERFORMANCE MONITOR DRAG & TOGGLE LOGIC
+================================================= */
+const monitorPanel = document.getElementById('monitorPanel');
+const toggleMonitorBtn = document.getElementById('toggleMonitorBtn');
+const closeMonitorBtn = document.getElementById('closeMonitorBtn');
+
+function toggleMonitor(show) {
+  if (!monitorPanel) return;
+  
+  if (show === undefined) {
+    show = monitorPanel.style.display === 'none';
+  }
+  
+  if (show) {
+    monitorPanel.style.display = 'flex';
+    localStorage.setItem('monitorVisible', 'true');
+    if (toggleMonitorBtn) {
+      const checkIcon = toggleMonitorBtn.querySelector('.check-icon');
+      if (checkIcon) checkIcon.style.display = 'inline-block';
+    }
+  } else {
+    monitorPanel.style.display = 'none';
+    localStorage.setItem('monitorVisible', 'false');
+    if (toggleMonitorBtn) {
+      const checkIcon = toggleMonitorBtn.querySelector('.check-icon');
+      if (checkIcon) checkIcon.style.display = 'none';
+    }
+  }
+}
+
+if (toggleMonitorBtn) {
+  toggleMonitorBtn.onclick = (e) => {
+    e.stopPropagation();
+    const isVisible = monitorPanel && monitorPanel.style.display !== 'none';
+    toggleMonitor(!isVisible);
+    if (optionsMenu) {
+      optionsMenu.classList.remove('show');
+    }
+  };
+}
+
+if (closeMonitorBtn) {
+  closeMonitorBtn.onclick = (e) => {
+    e.stopPropagation();
+    toggleMonitor(false);
+  };
+}
+
+// Dragging functionality
+if (monitorPanel) {
+  const header = monitorPanel.querySelector('.monitor-header') || monitorPanel;
+  let isDragging = false;
+  let startX, startY;
+  let startLeft, startTop;
+
+  // Restore saved position
+  const savedLeft = localStorage.getItem('monitorLeft');
+  const savedTop = localStorage.getItem('monitorTop');
+  const savedVisible = localStorage.getItem('monitorVisible');
+
+  if (savedLeft !== null && savedTop !== null) {
+    monitorPanel.style.left = savedLeft;
+    monitorPanel.style.top = savedTop;
+    monitorPanel.style.right = 'auto'; // override CSS right: 20px
+  }
+  
+  // Restore saved visibility (default to hidden if not set)
+  if (savedVisible === 'true') {
+    toggleMonitor(true);
+  } else {
+    toggleMonitor(false);
+  }
+
+  header.addEventListener('mousedown', dragStart);
+  header.addEventListener('touchstart', dragStart, { passive: false });
+
+  function dragStart(e) {
+    if (e.target.closest('#closeMonitorBtn')) return;
+    
+    isDragging = true;
+    
+    const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+    const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+    
+    const rect = monitorPanel.getBoundingClientRect();
+    
+    startX = clientX;
+    startY = clientY;
+    startLeft = rect.left;
+    startTop = rect.top;
+    
+    document.addEventListener('mousemove', dragMove);
+    document.addEventListener('mouseup', dragEnd);
+    document.addEventListener('touchmove', dragMove, { passive: false });
+    document.addEventListener('touchend', dragEnd);
+    
+    if (e.type === 'touchstart') {
+      e.preventDefault();
+    }
+  }
+
+  function dragMove(e) {
+    if (!isDragging) return;
+    
+    const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+    const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+    
+    const dx = clientX - startX;
+    const dy = clientY - startY;
+    
+    let newLeft = startLeft + dx;
+    let newTop = startTop + dy;
+    
+    const rect = monitorPanel.getBoundingClientRect();
+    const maxLeft = window.innerWidth - rect.width;
+    const maxTop = window.innerHeight - rect.height;
+    
+    newLeft = Math.max(0, Math.min(maxLeft, newLeft));
+    newTop = Math.max(0, Math.min(maxTop, newTop));
+    
+    monitorPanel.style.left = `${newLeft}px`;
+    monitorPanel.style.top = `${newTop}px`;
+    monitorPanel.style.right = 'auto';
+    
+    if (e.type === 'touchmove') {
+      e.preventDefault();
+    }
+  }
+
+  function dragEnd() {
+    isDragging = false;
+    document.removeEventListener('mousemove', dragMove);
+    document.removeEventListener('mouseup', dragEnd);
+    document.removeEventListener('touchmove', dragMove);
+    document.removeEventListener('touchend', dragEnd);
+    
+    localStorage.setItem('monitorLeft', monitorPanel.style.left);
+    localStorage.setItem('monitorTop', monitorPanel.style.top);
+  }
+  
+  // Adjust position if screen is resized
+  window.addEventListener('resize', () => {
+    if (monitorPanel.style.left) {
+      const rect = monitorPanel.getBoundingClientRect();
+      const maxLeft = window.innerWidth - rect.width;
+      const maxTop = window.innerHeight - rect.height;
+      
+      let currentLeft = parseFloat(monitorPanel.style.left);
+      let currentTop = parseFloat(monitorPanel.style.top);
+      
+      let adjusted = false;
+      if (currentLeft > maxLeft) {
+        currentLeft = Math.max(0, maxLeft);
+        adjusted = true;
+      }
+      if (currentTop > maxTop) {
+        currentTop = Math.max(0, maxTop);
+        adjusted = true;
+      }
+      
+      if (adjusted) {
+        monitorPanel.style.left = `${currentLeft}px`;
+        monitorPanel.style.top = `${currentTop}px`;
+        localStorage.setItem('monitorLeft', monitorPanel.style.left);
+        localStorage.setItem('monitorTop', monitorPanel.style.top);
+      }
+    }
+  });
+}
+
 
 // Participants Sidebar Logic
 if (participantsBtnMenu) {
@@ -493,7 +687,11 @@ init();
 async function initMedia() {
   try {
     localStream = await navigator.mediaDevices.getUserMedia({
-      video: true,
+      video: {
+        width: { ideal: 640, max: 1280 },
+        height: { ideal: 480, max: 720 },
+        frameRate: { ideal: 20, max: 24 }
+      },
       audio: {
         echoCancellation: true,
         noiseSuppression: true,
@@ -502,8 +700,7 @@ async function initMedia() {
     });
     addVideo(localStream, true);
     getCameraDevices();
-    socket.emit('join-room', room, name);
-    socket.emit('set-name', { name, role, userId });
+    joinSession();
     updateParticipantsList();
 
     socket.on('all-users', users => {
@@ -538,11 +735,16 @@ async function initMedia() {
     });
 
     socket.on('user-disconnected', id => {
-      if (peers[id]) { peers[id].pc.close(); delete peers[id]; }
+      if (peers[id]) {
+        if (peers[id].timeout) clearTimeout(peers[id].timeout);
+        try { peers[id].pc.close(); } catch (e) {}
+        delete peers[id];
+      }
       delete peerStreamType[id];
       const leftName = peerNames[id] || 'Peserta';
       delete peerNames[id];
       delete peerRoles[id];
+      delete peerStatuses[id];
       delete peerMediaStatus[id];
       clearUnfocusedTimer(id);
       delete unfocusedUsers[id];
@@ -560,6 +762,8 @@ async function initMedia() {
     });
 
     socket.on('user-focus-changed', data => {
+      peerStatuses[data.id] = data.status;
+
       // Update nama jika baru tersedia
       if (data.name && !peerNames[data.id]) {
         peerNames[data.id] = data.name;
@@ -595,6 +799,7 @@ async function initMedia() {
 
     socket.on('current-statuses', statuses => {
       statuses.forEach(({ id, status, name: pName }) => {
+        peerStatuses[id] = status;
         if (pName) {
           peerNames[id] = pName;
           const el = document.getElementById('name-' + id);
@@ -682,8 +887,18 @@ async function initMedia() {
       await handleSignal(from, signal);
     });
 
+    socket.on('recreate-peer', ({ from }) => {
+      console.log(`[reconnect] Received recreate-peer from ${from}, reconstructing connection.`);
+      if (peers[from]) {
+        try { peers[from].pc.close(); } catch (e) {}
+        delete peers[from];
+      }
+      createPeer(from, false); // Be impolite peer for this renegotiation
+    });
+
     // Mulai deteksi siapa yang bersuara
     startSpeakerDetection();
+    updateLocalResolution();
 
   } catch (err) {
     console.error('Media error:', err);
@@ -775,6 +990,32 @@ function startSpeakerDetection() {
 }
 
 /* =================================================
+   BANDWIDTH LIMITATION (NETWORK EFFICIENCY)
+================================================= */
+function limitVideoSenderBitrate(pc) {
+  const senders = pc.getSenders();
+  const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+  if (videoSender && videoSender.track) {
+    try {
+      const parameters = videoSender.getParameters();
+      if (!parameters.encodings) {
+        parameters.encodings = [{}];
+      }
+      if (parameters.encodings[0]) {
+        const isScreen = screenStream && screenStream.getVideoTracks().includes(videoSender.track);
+        const maxBitrate = isScreen ? 1500000 : 300000;
+        parameters.encodings[0].maxBitrate = maxBitrate;
+        videoSender.setParameters(parameters)
+          .then(() => console.log(`[bitrate-limiter] Bitrate limit set to ${maxBitrate} Bps for peer.`))
+          .catch(err => console.warn("[bitrate-limiter] setParameters error:", err));
+      }
+    } catch (err) {
+      console.warn("[bitrate-limiter] getParameters error:", err);
+    }
+  }
+}
+
+/* =================================================
    CREATE PEER
 ================================================= */
 function createPeer(id, polite) {
@@ -782,6 +1023,24 @@ function createPeer(id, polite) {
 
   const pc = new RTCPeerConnection(iceConfig);
   let makingOffer = false;
+
+  // Connection timeout checker (8 seconds)
+  const connectionTimeout = setTimeout(() => {
+    if (peers[id] && peers[id].pc) {
+      const state = peers[id].pc.connectionState;
+      const iceState = peers[id].pc.iceConnectionState;
+      if (state !== 'connected' && state !== 'completed' && iceState !== 'connected' && iceState !== 'completed') {
+        console.warn(`[WebRTC] Connection with ${id} timed out after 8s (state: ${state}, iceState: ${iceState}). Recreating...`);
+        recreatePeer(id);
+      }
+    }
+  }, 8000);
+
+  pc.onsignalingstatechange = () => {
+    if (pc.signalingState === 'stable') {
+      limitVideoSenderBitrate(pc);
+    }
+  };
 
   pc.onnegotiationneeded = async () => {
     if (!polite) return;
@@ -798,11 +1057,43 @@ function createPeer(id, polite) {
   };
 
   pc.oniceconnectionstatechange = () => {
-    if (pc.iceConnectionState === 'failed') pc.restartIce();
+    console.log(`[WebRTC] ICE state with ${id}: ${pc.iceConnectionState}`);
+    if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+      clearTimeout(connectionTimeout);
+    } else if (pc.iceConnectionState === 'disconnected') {
+      console.warn(`[WebRTC] ICE disconnected for ${id}. Attempting ICE restart...`);
+      pc.restartIce();
+    } else if (pc.iceConnectionState === 'failed') {
+      console.warn(`[WebRTC] ICE failed for ${id}. Recreating peer...`);
+      clearTimeout(connectionTimeout);
+      recreatePeer(id);
+    }
+  };
+
+  pc.onconnectionstatechange = () => {
+    console.log(`[WebRTC] Connection state with ${id}: ${pc.connectionState}`);
+    if (pc.connectionState === 'connected' || pc.connectionState === 'completed') {
+      clearTimeout(connectionTimeout);
+    } else if (pc.connectionState === 'failed') {
+      console.warn(`[WebRTC] Connection failed with ${id}. Recreating peer...`);
+      clearTimeout(connectionTimeout);
+      recreatePeer(id);
+    }
   };
 
   pc.ontrack = ({ track, streams }) => {
-    const stream = streams[0];
+    if (!peers[id]) return;
+    if (!peers[id].remoteStream) {
+      peers[id].remoteStream = new MediaStream();
+    }
+    
+    // Add track if not already added to prevent duplicates
+    const existingTracks = peers[id].remoteStream.getTracks();
+    if (!existingTracks.find(t => t.id === track.id)) {
+      peers[id].remoteStream.addTrack(track);
+    }
+    
+    const stream = peers[id].remoteStream;
 
     // Selalu buat/update video box peserta agar DOM-nya tersimpan di layout
     const existingBox = document.getElementById(id);
@@ -810,9 +1101,11 @@ function createPeer(id, polite) {
       const vid = existingBox.querySelector('video');
       if (vid) {
         // Force the video element to re-evaluate the stream
-        vid.srcObject = null;
-        vid.srcObject = stream;
-        vid.play().catch(console.error);
+        if (vid.srcObject !== stream) {
+          vid.srcObject = null;
+          vid.srcObject = stream;
+        }
+        playVideoElement(vid);
       }
     } else {
       addVideo(stream, false, id);
@@ -843,7 +1136,7 @@ function createPeer(id, polite) {
   if (videoTrack) pc.addTrack(videoTrack, localStream);
   if (audioTrack) pc.addTrack(audioTrack, localStream);
 
-  peers[id] = { pc, polite, getMakingOffer: () => makingOffer };
+  peers[id] = { pc, polite, getMakingOffer: () => makingOffer, candidatesQueue: [], timeout: connectionTimeout };
   return peers[id];
 }
 
@@ -862,21 +1155,38 @@ async function handleSignal(from, signal) {
       await pc.setRemoteDescription(new RTCSessionDescription(signal));
       await pc.setLocalDescription();
       socket.emit('signal', { to: from, signal: pc.localDescription });
+
+      // Process queued candidates
+      if (entry.candidatesQueue && entry.candidatesQueue.length > 0) {
+        for (const cand of entry.candidatesQueue) {
+          await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(err => {
+            console.error('[signal] Error adding queued candidate:', err);
+          });
+        }
+        entry.candidatesQueue = [];
+      }
     } else if (signal.type === 'answer') {
-      if (pc.signalingState === 'have-local-offer')
+      if (pc.signalingState === 'have-local-offer') {
         await pc.setRemoteDescription(new RTCSessionDescription(signal));
+
+        // Process queued candidates
+        if (entry.candidatesQueue && entry.candidatesQueue.length > 0) {
+          for (const cand of entry.candidatesQueue) {
+            await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(err => {
+              console.error('[signal] Error adding queued candidate:', err);
+            });
+          }
+          entry.candidatesQueue = [];
+        }
+      }
     } else if (signal.candidate) {
       if (pc.remoteDescription) {
         await pc.addIceCandidate(new RTCIceCandidate(signal)).catch(console.error);
       } else {
-        const wait = ms => new Promise(r => setTimeout(r, ms));
-        for (let i = 0; i < 15; i++) {
-          await wait(200);
-          if (pc.remoteDescription) {
-            await pc.addIceCandidate(new RTCIceCandidate(signal)).catch(console.error);
-            break;
-          }
+        if (!entry.candidatesQueue) {
+          entry.candidatesQueue = [];
         }
+        entry.candidatesQueue.push(signal);
       }
     }
   } catch (e) {
@@ -891,7 +1201,12 @@ async function handleSignal(from, signal) {
 function addVideo(stream, local = false, peerId = null) {
   if (!local && peerId && document.getElementById(peerId)) {
     const v = document.querySelector('#' + peerId + ' video');
-    if (v) { v.srcObject = stream; v.play().catch(console.error); }
+    if (v) {
+      if (v.srcObject !== stream) {
+        v.srcObject = stream;
+      }
+      playVideoElement(v);
+    }
     return;
   }
 
@@ -908,12 +1223,11 @@ function addVideo(stream, local = false, peerId = null) {
   // Berlakukan mirror (scaleX(-1)) untuk semua video peserta (lokal maupun remote)
   video.style.transform = 'scaleX(-1)';
 
-  video.onloadedmetadata = () =>
-    video.play().catch(() => {
-      ['click', 'touchstart'].forEach(evt =>
-        document.addEventListener(evt, () => video.play().catch(console.error), { once: true })
-      );
-    });
+  if (local) {
+    video.onloadedmetadata = () => video.play().catch(console.error);
+  } else {
+    video.onloadedmetadata = () => playVideoElement(video);
+  }
 
   // ✅ Indikator online — titik hijau kanan atas
   const indicator = document.createElement('div');
@@ -928,8 +1242,18 @@ function addVideo(stream, local = false, peerId = null) {
   // ✅ Status fokus AI — di atas nama
   const status = document.createElement('div');
   status.className = 'status';
-  status.innerText = local ? 'Calibrating...' : 'Detecting...';
-  if (!local && peerId) status.id = 'status-' + peerId;
+  
+  const initialStatus = local ? 'Calibrating...' : (peerStatuses[peerId] || 'Detecting...');
+  status.innerText = initialStatus;
+  
+  if (!local && peerId) {
+    status.id = 'status-' + peerId;
+    if (initialStatus === 'Memperhatikan') {
+      status.style.color = '#81c995';
+    } else if (['Tidak Memperhatikan', 'Tidak ada Wajah', 'Kamera Mati'].includes(initialStatus)) {
+      status.style.color = '#f28b82';
+    }
+  }
 
   box.appendChild(video);
   box.appendChild(indicator);
@@ -1002,6 +1326,11 @@ function updatePagination() {
   } else {
     if (prevBtn) prevBtn.style.display = 'none';
     if (nextBtn) nextBtn.style.display = 'none';
+  }
+
+  const valParticipants = document.getElementById('valParticipants');
+  if (valParticipants) {
+    valParticipants.innerText = allVideoBoxes.length;
   }
 }
 
@@ -1115,7 +1444,7 @@ function stopScreenShare() {
 function initFocus(video, status) {
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
-  const CALIB_FRAMES = 30; // 3.0 detik kalibrasi (pada 10 FPS)
+  const CALIB_FRAMES = 15; // 1.5 detik kalibrasi (pada 10 FPS)
   const EAR_BLINK_RATIO = 0.75;
   const GAZE_TOLERANCE = 0.25;
   const YAW_TOLERANCE = 0.35;
@@ -1144,6 +1473,18 @@ function initFocus(video, status) {
 
   let lastReportedStatus = 'Calibrating...';
 
+  // Liveness verification & Anti-spoofing rolling buffers
+  let gazeHistory = [];
+  let vGazeHistory = [];
+  let earHistory = [];
+
+  function getStdDev(arr) {
+    if (arr.length === 0) return 0;
+    const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+    const variance = arr.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / arr.length;
+    return Math.sqrt(variance);
+  }
+
   function safeUpdateStatus(newStatus, color) {
     if (lastReportedStatus !== newStatus) {
       lastReportedStatus = newStatus;
@@ -1161,6 +1502,10 @@ function initFocus(video, status) {
         consecutiveFocusing = 0;
         if (consecutiveNoFace >= NO_FACE_FRAMES) {
           safeUpdateStatus('Tidak ada Wajah', 'orange');
+          // Clear micro-movement histories when face is missing
+          gazeHistory = [];
+          vGazeHistory = [];
+          earHistory = [];
         }
       }
       return;
@@ -1199,6 +1544,30 @@ function initFocus(video, status) {
       (lm[473].y - lm[386].y) / (lm[374].y - lm[386].y)
     ) / 2;
 
+    // Kalkulasi rasio proporsi wajah (jarak dahi-hidung vs hidung-dagu)
+    const dForeheadNose = Math.abs(noseTip.y - topFace.y);
+    const dNoseChin = Math.abs(bottomFace.y - noseTip.y);
+    let faceRatio = 1.0;
+    if (dForeheadNose > 0) {
+      faceRatio = dNoseChin / dForeheadNose;
+    }
+
+    const isCropped = faceRatio < 0.45 || faceRatio > 2.2;
+
+    if (isCropped) {
+      gazeHistory = [];
+      vGazeHistory = [];
+      earHistory = [];
+      if (!calibDone) {
+        calibCount = 0;
+        earSum = 0; gazeSum = 0; yawSum = 0; pitchSum = 0; vGazeSum = 0;
+        status.innerHTML = `Calibrating (Tunjukkan Wajah Penuh)...`;
+        status.style.color = '#fbbc04';
+      }
+      safeUpdateStatus('Tidak ada Wajah', 'orange');
+      return;
+    }
+
     if (!calibDone) {
       earSum += ear; gazeSum += gaze; yawSum += yaw; pitchSum += pitch; vGazeSum += vGaze;
       calibCount++;
@@ -1212,25 +1581,58 @@ function initFocus(video, status) {
         pitchCenter = pitchSum / CALIB_FRAMES;
         vGazeCenter = vGazeSum / CALIB_FRAMES;
         calibDone = true;
+        gazeHistory = [];
+        vGazeHistory = [];
+        earHistory = [];
       }
       return;
     }
 
     let currentStatus = 'Focusing';
 
-    if (ear < earThreshold) {
-      currentStatus = 'Eyes Closed';
-    } else if (yaw < yawCenter - YAW_TOLERANCE || yaw > yawCenter + YAW_TOLERANCE) {
-      currentStatus = 'Not Focused';
-    } else if (pitch < pitchCenter - PITCH_TOLERANCE || pitch > pitchCenter + PITCH_TOLERANCE) {
-      currentStatus = 'Not Focused';
-    } else if (gaze < gazeCenter - GAZE_TOLERANCE || gaze > gazeCenter + GAZE_TOLERANCE) {
-      currentStatus = 'Not Focused';
-    } else if (vGaze < vGazeCenter - VERTICAL_GAZE_TOLERANCE || vGaze > vGazeCenter + VERTICAL_GAZE_TOLERANCE) {
-      currentStatus = 'Not Focused';
+    // Passive micro-movement liveness verification
+    gazeHistory.push(gaze);
+    vGazeHistory.push(vGaze);
+    earHistory.push(ear);
+    if (gazeHistory.length > 80) {
+      gazeHistory.shift();
+      vGazeHistory.shift();
+      earHistory.shift();
     }
 
-    if (currentStatus === 'Eyes Closed') {
+    let isStaticSpoof = false;
+    if (gazeHistory.length === 80) {
+      const sdGaze = getStdDev(gazeHistory);
+      const sdVGaze = getStdDev(vGazeHistory);
+      const sdEar = getStdDev(earHistory);
+      const livenessScore = sdGaze + sdVGaze + sdEar;
+      if (livenessScore < 0.0055) {
+        isStaticSpoof = true;
+      }
+    }
+
+    if (isStaticSpoof) {
+      currentStatus = 'StaticSpoof';
+    } else {
+      if (ear < earThreshold) {
+        currentStatus = 'Eyes Closed';
+      } else if (yaw < yawCenter - YAW_TOLERANCE || yaw > yawCenter + YAW_TOLERANCE) {
+        currentStatus = 'Not Focused';
+      } else if (pitch < pitchCenter - PITCH_TOLERANCE || pitch > pitchCenter + PITCH_TOLERANCE) {
+        currentStatus = 'Not Focused';
+      } else if (gaze < gazeCenter - GAZE_TOLERANCE || gaze > gazeCenter + GAZE_TOLERANCE) {
+        currentStatus = 'Not Focused';
+      } else if (vGaze < vGazeCenter - VERTICAL_GAZE_TOLERANCE || vGaze > vGazeCenter + VERTICAL_GAZE_TOLERANCE) {
+        currentStatus = 'Not Focused';
+      }
+    }
+
+    if (currentStatus === 'StaticSpoof') {
+      consecutiveEyesClosed = 0;
+      consecutiveNotFocused = 0;
+      consecutiveFocusing = 0;
+      safeUpdateStatus('Tidak ada Wajah', 'orange');
+    } else if (currentStatus === 'Eyes Closed') {
       consecutiveEyesClosed++;
       consecutiveNotFocused = 0;
       consecutiveFocusing = 0;
@@ -1264,10 +1666,22 @@ function initFocus(video, status) {
         const now = Date.now();
         if (now - lastProcessedTime >= PROCESS_INTERVAL_MS) {
           lastProcessedTime = now;
+          const t0 = performance.now();
           await faceMesh.send({ image: video });
+          const t1 = performance.now();
+          const valInference = document.getElementById('valInference');
+          if (valInference) {
+            valInference.innerText = `${Math.round(t1 - t0)} ms`;
+          }
         }
-      } else if (!track?.enabled) {
-        safeUpdateStatus('Kamera Mati', '#808080');
+      } else {
+        const valInference = document.getElementById('valInference');
+        if (valInference) {
+          valInference.innerText = '-';
+        }
+        if (!track?.enabled) {
+          safeUpdateStatus('Kamera Mati', '#808080');
+        }
       }
     } catch (_) { }
     requestAnimationFrame(processVideo);
@@ -1311,7 +1725,7 @@ function showToast(msg) {
 }
 
 /* =================================================
-   REAL-TIME MONITORING PANEL (FPS, Latency, CPU, RAM)
+   REAL-TIME MONITORING PANEL (FPS, Latency, CPU, RAM, Participants, Resolution, Inference)
 ================================================= */
 let lastFrameTime = performance.now();
 let frameCount = 0;
@@ -1319,6 +1733,20 @@ const valFPS = document.getElementById('valFPS');
 const valLatency = document.getElementById('valLatency');
 const valCPU = document.getElementById('valCPU');
 const valRAM = document.getElementById('valRAM');
+const valResolution = document.getElementById('valResolution');
+
+function updateLocalResolution() {
+  if (!valResolution) return;
+  const videoTrack = localStream?.getVideoTracks()[0];
+  if (videoTrack && videoTrack.enabled) {
+    const settings = videoTrack.getSettings();
+    if (settings && settings.width && settings.height) {
+      valResolution.innerText = `${settings.width}×${settings.height}`;
+      return;
+    }
+  }
+  valResolution.innerText = '-';
+}
 
 function measureFPS() {
   const now = performance.now();
@@ -1411,7 +1839,10 @@ async function switchCamera(deviceId) {
     // 2. Minta akses kamera yang baru
     const newStream = await navigator.mediaDevices.getUserMedia({
       video: {
-        deviceId: { exact: deviceId }
+        deviceId: { exact: deviceId },
+        width: { ideal: 640, max: 1280 },
+        height: { ideal: 480, max: 720 },
+        frameRate: { ideal: 20, max: 24 }
       }
     });
     
@@ -1436,6 +1867,7 @@ async function switchCamera(deviceId) {
         const sender = pc.getSenders().find(s => s.track?.kind === 'video');
         if (sender) {
           await sender.replaceTrack(newVideoTrack);
+          limitVideoSenderBitrate(pc);
         }
       }
     }
@@ -1450,6 +1882,7 @@ async function switchCamera(deviceId) {
       mic: localStream.getAudioTracks()[0]?.enabled,
       cam: isCamOn
     });
+    updateLocalResolution();
     
   } catch (err) {
     console.error("Gagal beralih kamera:", err);
@@ -1485,3 +1918,61 @@ document.getElementById('cameraSelect')?.addEventListener('change', (e) => {
 if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
   navigator.mediaDevices.addEventListener('devicechange', getCameraDevices);
 }
+
+/* =================================================
+   AUTO-RECONNECT & STATE RECOVERY
+================================================= */
+function cleanupPeers() {
+  console.log("[reconnect] Cleaning up all existing WebRTC peer connections...");
+  for (let id in peers) {
+    if (peers[id]) {
+      try {
+        peers[id].pc.close();
+      } catch (e) {
+        console.warn("[reconnect] Error closing peer connection for", id, e);
+      }
+      delete peers[id];
+    }
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  }
+  allVideoBoxes = allVideoBoxes.filter(b => b.id === 'local');
+  updatePagination();
+  updateParticipantsList();
+}
+
+function recreatePeer(id) {
+  console.log(`[reconnect] Initiating peer recreation for: ${id}`);
+  if (peers[id]) {
+    try { peers[id].pc.close(); } catch (e) {}
+    delete peers[id];
+  }
+  socket.emit('recreate-peer', { to: id });
+  createPeer(id, true); // Be polite peer so we initiate negotiation
+}
+
+function joinSession() {
+  if (!socket.connected || !localStream) {
+    console.log("[reconnect] Cannot join session yet (socket connected:", socket.connected, ", localStream ready:", !!localStream, ")");
+    return;
+  }
+  
+  console.log("[reconnect] Joining session. socket.id:", socket.id);
+  cleanupPeers();
+  
+  socket.emit('join-room', { room, name, role, userId });
+  socket.emit('set-name', { name, role, userId });
+  socket.emit('media-status', {
+    mic: localStream.getAudioTracks()[0]?.enabled,
+    cam: localStream.getVideoTracks()[0]?.enabled
+  });
+  if (screenStream) {
+    socket.emit('screen-share-start');
+  }
+}
+
+// Socket reconnect handler
+socket.on('connect', () => {
+  console.log("[socket] Connected/Reconnected. Socket ID:", socket.id);
+  joinSession();
+});

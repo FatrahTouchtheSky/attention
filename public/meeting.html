@@ -15,24 +15,42 @@
 
 <body>
     <!-- Real-time Monitoring Panel -->
-    <!-- <div id="monitorPanel" class="monitor-panel">
-        <div class="monitor-item">
-            <span><i class="fas fa-tachometer-alt"></i> FPS</span>
-            <span id="valFPS">0</span>
+    <div id="monitorPanel" class="monitor-panel" style="display: none;">
+        <div class="monitor-header">
+            <div class="monitor-title">Performance Monitor</div>
+            <button id="closeMonitorBtn" class="monitor-close-btn" title="Close"><i class="fas fa-times"></i></button>
         </div>
-        <div class="monitor-item">
-            <span><i class="fas fa-network-wired"></i> Latency</span>
-            <span id="valLatency">0 ms</span>
+        <div class="monitor-divider"></div>
+        <div class="monitor-grid">
+            <div class="monitor-label">FPS</div>
+            <div class="monitor-colon">:</div>
+            <div class="monitor-value" id="valFPS">0</div>
+            
+            <div class="monitor-label">Latency</div>
+            <div class="monitor-colon">:</div>
+            <div class="monitor-value" id="valLatency">0 ms</div>
+            
+            <div class="monitor-label">CPU</div>
+            <div class="monitor-colon">:</div>
+            <div class="monitor-value" id="valCPU">0%</div>
+            
+            <div class="monitor-label">RAM</div>
+            <div class="monitor-colon">:</div>
+            <div class="monitor-value" id="valRAM">0 MB</div>
+            
+            <div class="monitor-label">Participants</div>
+            <div class="monitor-colon">:</div>
+            <div class="monitor-value" id="valParticipants">1</div>
+            
+            <div class="monitor-label">Resolution</div>
+            <div class="monitor-colon">:</div>
+            <div class="monitor-value" id="valResolution">-</div>
+            
+            <div class="monitor-label">Inference</div>
+            <div class="monitor-colon">:</div>
+            <div class="monitor-value" id="valInference">0 ms</div>
         </div>
-        <div class="monitor-item">
-            <span><i class="fas fa-microchip"></i> CPU</span>
-            <span id="valCPU">0%</span>
-        </div>
-        <div class="monitor-item">
-            <span><i class="fas fa-memory"></i> RAM</span>
-            <span id="valRAM">0 MB</span>
-        </div>
-    </div> -->
+    </div>
     <div id="mainStage"></div>
     <div id="videos"></div>
     <div id="focusNotif" class="focus-notif" style="display: none;"></div>
@@ -61,6 +79,11 @@
                     Participants</button>
                 <button id="summaryBtnMenu" class="menu-item moderator-only" style="display: none;"><i
                         class="fas fa-chart-bar"></i> Attention Summary</button>
+                <button id="toggleMonitorBtn" class="menu-item">
+                    <i class="fas fa-tachometer-alt"></i>
+                    Performance Monitor
+                    <i class="fas fa-check check-icon" style="margin-left: auto; display: none;"></i>
+                </button>
             </div>
         </div>
         <button id="leaveBtn" class="control-btn leave-btn" title="End Call">

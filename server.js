@@ -256,6 +256,10 @@
 
 // =============================================|| chatgpt ||===============================================
 require('dotenv').config();
+if (!process.env.TURN_USERNAME || !process.env.TURN_CREDENTIAL) {
+  console.warn("\x1b[33m%s\x1b[0m", "⚠️ WARNING: TURN_USERNAME atau TURN_CREDENTIAL tidak ditemukan di .env!");
+  console.warn("\x1b[33m%s\x1b[0m", "⚠️ Hal ini dapat menyebabkan kegagalan koneksi WebRTC (layar hitam) untuk pengguna di jaringan seluler (4G/5G) atau di belakang NAT ketat.");
+}
 const express = require('express');
 const http    = require('http');
 const { Server } = require('socket.io');
@@ -409,8 +413,46 @@ io.on('connection', socket => {
     }
   });
 
-  socket.on('join-room', room => {
+  socket.on('join-room', roomData => {
+    let room;
+    let name = null;
+    let role = 'participant';
+    let uId = null;
+
+    if (roomData && typeof roomData === 'object') {
+      room = roomData.room;
+      name = roomData.name;
+      role = roomData.role;
+      uId = roomData.userId;
+    } else {
+      room = roomData;
+    }
+
     currentRoom = room;
+
+    // Bersihkan lingering socket lama milik userId yang sama sebelum join
+    if (room && uId) {
+      socket.userId = uId;
+      if (name) socket.userName = name;
+      socket.userRole = role;
+
+      const clientsInRoom = io.sockets.adapter.rooms.get(room);
+      if (clientsInRoom) {
+        const clientsArray = [...clientsInRoom];
+        clientsArray.forEach(id => {
+          if (id !== socket.id) {
+            const existingSocket = io.sockets.sockets.get(id);
+            if (existingSocket && existingSocket.userId === uId) {
+              console.log(`[duplicate cleanup] Memutus socket lama ${id} untuk user ${uId}`);
+              existingSocket.leave(room);
+              existingSocket.disconnect(true);
+              socket.to(room).emit('user-disconnected', id);
+            }
+          }
+        });
+      }
+    }
+
     socket.join(room);
 
     const clients = [...(io.sockets.adapter.rooms.get(room) || [])];
@@ -466,6 +508,12 @@ io.on('connection', socket => {
 
   socket.on('signal', ({ to, signal }) => {
     io.to(to).emit('signal', { from: socket.id, signal });
+  });
+
+  socket.on('recreate-peer', ({ to }) => {
+    if (to) {
+      io.to(to).emit('recreate-peer', { from: socket.id });
+    }
   });
 
   socket.on('update-focus', data => {
