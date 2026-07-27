@@ -737,6 +737,7 @@ async function initMedia() {
     socket.on('user-disconnected', id => {
       if (peers[id]) {
         if (peers[id].timeout) clearTimeout(peers[id].timeout);
+        if (peers[id].pc && peers[id].pc.iceRestartTimer) clearTimeout(peers[id].pc.iceRestartTimer);
         try { peers[id].pc.close(); } catch (e) {}
         delete peers[id];
       }
@@ -1060,12 +1061,28 @@ function createPeer(id, polite) {
     console.log(`[WebRTC] ICE state with ${id}: ${pc.iceConnectionState}`);
     if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
       clearTimeout(connectionTimeout);
+      if (pc.iceRestartTimer) {
+        clearTimeout(pc.iceRestartTimer);
+        pc.iceRestartTimer = null;
+      }
     } else if (pc.iceConnectionState === 'disconnected') {
       console.warn(`[WebRTC] ICE disconnected for ${id}. Attempting ICE restart...`);
-      pc.restartIce();
+      try {
+        pc.restartIce();
+      } catch (err) {
+        console.error(`[WebRTC] restartIce failed for ${id}:`, err);
+      }
+      if (pc.iceRestartTimer) clearTimeout(pc.iceRestartTimer);
+      pc.iceRestartTimer = setTimeout(() => {
+        if (peers[id] && (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed')) {
+          console.warn(`[WebRTC] ICE restart failed after 6 seconds for ${id}. Recreating peer...`);
+          recreatePeer(id);
+        }
+      }, 6000);
     } else if (pc.iceConnectionState === 'failed') {
       console.warn(`[WebRTC] ICE failed for ${id}. Recreating peer...`);
       clearTimeout(connectionTimeout);
+      if (pc.iceRestartTimer) clearTimeout(pc.iceRestartTimer);
       recreatePeer(id);
     }
   };
@@ -1074,9 +1091,14 @@ function createPeer(id, polite) {
     console.log(`[WebRTC] Connection state with ${id}: ${pc.connectionState}`);
     if (pc.connectionState === 'connected' || pc.connectionState === 'completed') {
       clearTimeout(connectionTimeout);
+      if (pc.iceRestartTimer) {
+        clearTimeout(pc.iceRestartTimer);
+        pc.iceRestartTimer = null;
+      }
     } else if (pc.connectionState === 'failed') {
       console.warn(`[WebRTC] Connection failed with ${id}. Recreating peer...`);
       clearTimeout(connectionTimeout);
+      if (pc.iceRestartTimer) clearTimeout(pc.iceRestartTimer);
       recreatePeer(id);
     }
   };
@@ -1100,11 +1122,9 @@ function createPeer(id, polite) {
     if (existingBox) {
       const vid = existingBox.querySelector('video');
       if (vid) {
-        // Force the video element to re-evaluate the stream
-        if (vid.srcObject !== stream) {
-          vid.srcObject = null;
-          vid.srcObject = stream;
-        }
+        // Force the video element to re-evaluate the stream to detect the newly added track (especially when audio/video arrive sequentially)
+        vid.srcObject = null;
+        vid.srcObject = stream;
         playVideoElement(vid);
       }
     } else {
@@ -1202,9 +1222,9 @@ function addVideo(stream, local = false, peerId = null) {
   if (!local && peerId && document.getElementById(peerId)) {
     const v = document.querySelector('#' + peerId + ' video');
     if (v) {
-      if (v.srcObject !== stream) {
-        v.srcObject = stream;
-      }
+      // Force re-binding to make sure the browser detects newly added tracks (especially when audio/video arrive sequentially)
+      v.srcObject = null;
+      v.srcObject = stream;
       playVideoElement(v);
     }
     return;
