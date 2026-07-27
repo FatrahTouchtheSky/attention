@@ -1714,11 +1714,21 @@ function initFocus(video, status) {
           if (valInference) {
             valInference.innerText = `${Math.round(duration)} ms`;
           }
+
+          const valLocalLoad = document.getElementById('valLocalLoad');
+          if (valLocalLoad) {
+            const localLoadPct = Math.min(100, Math.round((duration / currentProcessInterval) * 100));
+            valLocalLoad.innerText = `${localLoadPct}%`;
+          }
         }
       } else {
         const valInference = document.getElementById('valInference');
         if (valInference) {
           valInference.innerText = '-';
+        }
+        const valLocalLoad = document.getElementById('valLocalLoad');
+        if (valLocalLoad) {
+          valLocalLoad.innerText = '0%';
         }
         if (!track?.enabled) {
           safeUpdateStatus('Kamera Mati', '#808080');
