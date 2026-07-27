@@ -665,6 +665,8 @@ video {
     align-items: center;
     justify-content: center;
     transition: box-shadow 0.2s ease-in-out;
+    content-visibility: auto;
+    contain-intrinsic-size: 320px 240px;
 }
 
 .video-container.speaking {

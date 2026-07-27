@@ -639,7 +639,7 @@ function updateParticipantsList() {
    PRELOAD AI MODEL
 ================================================= */
 const faceMesh = new FaceMesh({
-  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`
+  locateFile: f => `/mediapipe/${f}`
 });
 faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true });
 faceMesh.initialize();
@@ -688,9 +688,9 @@ async function initMedia() {
   try {
     localStream = await navigator.mediaDevices.getUserMedia({
       video: {
-        width: { ideal: 640, max: 1280 },
-        height: { ideal: 480, max: 720 },
-        frameRate: { ideal: 20, max: 24 }
+        width: { ideal: 640, max: 640 },
+        height: { ideal: 480, max: 480 },
+        frameRate: { ideal: 15, max: 20 }
       },
       audio: {
         echoCancellation: true,
@@ -1610,23 +1610,23 @@ function initFocus(video, status) {
 
     let currentStatus = 'Focusing';
 
-    // Passive micro-movement liveness verification
+    // Passive micro-movement liveness verification (frame-rate agnostic rolling buffer)
     gazeHistory.push(gaze);
     vGazeHistory.push(vGaze);
     earHistory.push(ear);
-    if (gazeHistory.length > 80) {
+    if (gazeHistory.length > 40) {
       gazeHistory.shift();
       vGazeHistory.shift();
       earHistory.shift();
     }
 
     let isStaticSpoof = false;
-    if (gazeHistory.length === 80) {
+    if (gazeHistory.length >= 30) {
       const sdGaze = getStdDev(gazeHistory);
       const sdVGaze = getStdDev(vGazeHistory);
       const sdEar = getStdDev(earHistory);
       const livenessScore = sdGaze + sdVGaze + sdEar;
-      if (livenessScore < 0.0055) {
+      if (livenessScore < 0.0045) {
         isStaticSpoof = true;
       }
     }
@@ -1676,22 +1676,43 @@ function initFocus(video, status) {
     }
   });
 
+  // Reusable lightweight offscreen canvas (256x192) for AI inference downscaling
+  const aiCanvas = document.createElement('canvas');
+  aiCanvas.width = 256;
+  aiCanvas.height = 192;
+  const aiCtx = aiCanvas.getContext('2d', { alpha: false, willReadFrequently: false });
+
   let lastProcessedTime = 0;
-  const PROCESS_INTERVAL_MS = 100; // Batasi pemanggilan model FaceMesh maksimal 10 FPS (100ms sekali)
+  let currentProcessInterval = 120; // Default 120ms (~8 FPS) for optimal CPU/GPU balance
 
   async function processVideo() {
     try {
-      const track = localStream.getVideoTracks()[0];
+      const track = localStream?.getVideoTracks()[0];
       if (track?.enabled && video.readyState === 4 && video.videoWidth > 0) {
         const now = Date.now();
-        if (now - lastProcessedTime >= PROCESS_INTERVAL_MS) {
+        if (now - lastProcessedTime >= currentProcessInterval) {
           lastProcessedTime = now;
           const t0 = performance.now();
-          await faceMesh.send({ image: video });
+
+          // Scale camera frame onto 256x192 offscreen canvas before feeding AI model
+          aiCtx.drawImage(video, 0, 0, 256, 192);
+          await faceMesh.send({ image: aiCanvas });
+
           const t1 = performance.now();
+          const duration = t1 - t0;
+
+          // Adaptive Auto-Tuning: adjust interval dynamically based on device inference speed
+          if (duration > 70) {
+            // Slower device: scale interval up to 180ms - 220ms (~5 FPS) to free up CPU/GPU
+            currentProcessInterval = Math.min(220, currentProcessInterval + 10);
+          } else if (duration < 35 && currentProcessInterval > 120) {
+            // Fast device: recover interval back to 120ms (~8 FPS)
+            currentProcessInterval = Math.max(120, currentProcessInterval - 5);
+          }
+
           const valInference = document.getElementById('valInference');
           if (valInference) {
-            valInference.innerText = `${Math.round(t1 - t0)} ms`;
+            valInference.innerText = `${Math.round(duration)} ms`;
           }
         }
       } else {
@@ -1860,9 +1881,9 @@ async function switchCamera(deviceId) {
     const newStream = await navigator.mediaDevices.getUserMedia({
       video: {
         deviceId: { exact: deviceId },
-        width: { ideal: 640, max: 1280 },
-        height: { ideal: 480, max: 720 },
-        frameRate: { ideal: 20, max: 24 }
+        width: { ideal: 640, max: 640 },
+        height: { ideal: 480, max: 480 },
+        frameRate: { ideal: 15, max: 20 }
       }
     });
     
