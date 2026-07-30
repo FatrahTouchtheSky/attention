@@ -26,19 +26,21 @@ if (!name || !room) {
 
 
 document.getElementById('info').innerHTML =
-  // `<i class="fas fa-users"></i> Room: <b id="roomIdText">${room}</b> ` +
   `Room ID: <b id="roomIdText">${room}</b> ` +
-  `<i class="fas fa-copy" id="copyRoomBtn" style="cursor:pointer; margin-left: 6px; opacity: 0.8;" title="Copy Room ID"></i>` +
-  `<i class="fas fa-share-alt" id="smallShareLinkBtn" style="cursor:pointer; margin-left: 6px; opacity: 0.8;" title="Copy Meeting Link"></i>`;
+  `<img src="copy.png" id="copyRoomBtn" class="info-icon-btn" title="Copy Room ID">` +
+  `<img src="share.png" id="smallShareLinkBtn" class="info-icon-btn" title="Copy Meeting Link">`;
 
 document.getElementById('copyRoomBtn').addEventListener('click', () => {
   navigator.clipboard.writeText(room).then(() => {
     const btn = document.getElementById('copyRoomBtn');
-    btn.className = 'fas fa-check';
-    btn.style.color = '#81c995';
+    btn.style.filter = 'drop-shadow(0 0 4px #81c995) brightness(1.3)';
+    btn.style.transform = 'scale(1.25)';
+    if (typeof showToast === 'function') {
+      showToast("Room ID disalin ke clipboard!");
+    }
     setTimeout(() => {
-      btn.className = 'fas fa-copy';
-      btn.style.color = '';
+      btn.style.filter = '';
+      btn.style.transform = '';
     }, 2000);
   });
 });
@@ -47,16 +49,16 @@ document.getElementById('smallShareLinkBtn').addEventListener('click', () => {
   const link = window.location.origin + '/' + room;
   navigator.clipboard.writeText(link).then(() => {
     const btn = document.getElementById('smallShareLinkBtn');
-    btn.className = 'fas fa-check';
-    btn.style.color = '#81c995';
+    btn.style.filter = 'drop-shadow(0 0 4px #81c995) brightness(1.3)';
+    btn.style.transform = 'scale(1.25)';
     if (typeof showToast === 'function') {
       showToast("Tautan meeting disalin ke clipboard!");
     } else {
       alert("Tautan meeting disalin ke clipboard!");
     }
     setTimeout(() => {
-      btn.className = 'fas fa-share-alt';
-      btn.style.color = '';
+      btn.style.filter = '';
+      btn.style.transform = '';
     }, 2000);
   }).catch(err => {
     console.error("Could not copy text: ", err);
@@ -89,7 +91,7 @@ function playVideoElement(video) {
     console.warn("[Autoplay] Play failed, trying muted:", err.message);
     video.muted = true;
     video.play().catch(err2 => console.error("[Autoplay] Muted play also failed:", err2));
-    
+
     // Unmute on first user interaction
     const unmute = () => {
       video.muted = false;
@@ -291,11 +293,11 @@ const closeMonitorBtn = document.getElementById('closeMonitorBtn');
 
 function toggleMonitor(show) {
   if (!monitorPanel) return;
-  
+
   if (show === undefined) {
     show = monitorPanel.style.display === 'none';
   }
-  
+
   if (show) {
     monitorPanel.style.display = 'flex';
     localStorage.setItem('monitorVisible', 'true');
@@ -348,7 +350,7 @@ if (monitorPanel) {
     monitorPanel.style.top = savedTop;
     monitorPanel.style.right = 'auto'; // override CSS right: 20px
   }
-  
+
   // Restore saved visibility (default to hidden if not set)
   if (savedVisible === 'true') {
     toggleMonitor(true);
@@ -361,24 +363,24 @@ if (monitorPanel) {
 
   function dragStart(e) {
     if (e.target.closest('#closeMonitorBtn')) return;
-    
+
     isDragging = true;
-    
+
     const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
     const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
-    
+
     const rect = monitorPanel.getBoundingClientRect();
-    
+
     startX = clientX;
     startY = clientY;
     startLeft = rect.left;
     startTop = rect.top;
-    
+
     document.addEventListener('mousemove', dragMove);
     document.addEventListener('mouseup', dragEnd);
     document.addEventListener('touchmove', dragMove, { passive: false });
     document.addEventListener('touchend', dragEnd);
-    
+
     if (e.type === 'touchstart') {
       e.preventDefault();
     }
@@ -386,27 +388,27 @@ if (monitorPanel) {
 
   function dragMove(e) {
     if (!isDragging) return;
-    
+
     const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
     const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
-    
+
     const dx = clientX - startX;
     const dy = clientY - startY;
-    
+
     let newLeft = startLeft + dx;
     let newTop = startTop + dy;
-    
+
     const rect = monitorPanel.getBoundingClientRect();
     const maxLeft = window.innerWidth - rect.width;
     const maxTop = window.innerHeight - rect.height;
-    
+
     newLeft = Math.max(0, Math.min(maxLeft, newLeft));
     newTop = Math.max(0, Math.min(maxTop, newTop));
-    
+
     monitorPanel.style.left = `${newLeft}px`;
     monitorPanel.style.top = `${newTop}px`;
     monitorPanel.style.right = 'auto';
-    
+
     if (e.type === 'touchmove') {
       e.preventDefault();
     }
@@ -418,21 +420,21 @@ if (monitorPanel) {
     document.removeEventListener('mouseup', dragEnd);
     document.removeEventListener('touchmove', dragMove);
     document.removeEventListener('touchend', dragEnd);
-    
+
     localStorage.setItem('monitorLeft', monitorPanel.style.left);
     localStorage.setItem('monitorTop', monitorPanel.style.top);
   }
-  
+
   // Adjust position if screen is resized
   window.addEventListener('resize', () => {
     if (monitorPanel.style.left) {
       const rect = monitorPanel.getBoundingClientRect();
       const maxLeft = window.innerWidth - rect.width;
       const maxTop = window.innerHeight - rect.height;
-      
+
       let currentLeft = parseFloat(monitorPanel.style.left);
       let currentTop = parseFloat(monitorPanel.style.top);
-      
+
       let adjusted = false;
       if (currentLeft > maxLeft) {
         currentLeft = Math.max(0, maxLeft);
@@ -442,7 +444,7 @@ if (monitorPanel) {
         currentTop = Math.max(0, maxTop);
         adjusted = true;
       }
-      
+
       if (adjusted) {
         monitorPanel.style.left = `${currentLeft}px`;
         monitorPanel.style.top = `${currentTop}px`;
@@ -738,7 +740,7 @@ async function initMedia() {
       if (peers[id]) {
         if (peers[id].timeout) clearTimeout(peers[id].timeout);
         if (peers[id].pc && peers[id].pc.iceRestartTimer) clearTimeout(peers[id].pc.iceRestartTimer);
-        try { peers[id].pc.close(); } catch (e) {}
+        try { peers[id].pc.close(); } catch (e) { }
         delete peers[id];
       }
       delete peerStreamType[id];
@@ -891,7 +893,7 @@ async function initMedia() {
     socket.on('recreate-peer', ({ from }) => {
       console.log(`[reconnect] Received recreate-peer from ${from}, reconstructing connection.`);
       if (peers[from]) {
-        try { peers[from].pc.close(); } catch (e) {}
+        try { peers[from].pc.close(); } catch (e) { }
         delete peers[from];
       }
       createPeer(from, false); // Be impolite peer for this renegotiation
@@ -1108,13 +1110,13 @@ function createPeer(id, polite) {
     if (!peers[id].remoteStream) {
       peers[id].remoteStream = new MediaStream();
     }
-    
+
     // Add track if not already added to prevent duplicates
     const existingTracks = peers[id].remoteStream.getTracks();
     if (!existingTracks.find(t => t.id === track.id)) {
       peers[id].remoteStream.addTrack(track);
     }
-    
+
     const stream = peers[id].remoteStream;
 
     // Selalu buat/update video box peserta agar DOM-nya tersimpan di layout
@@ -1245,8 +1247,14 @@ function addVideo(stream, local = false, peerId = null) {
 
   if (local) {
     video.onloadedmetadata = () => video.play().catch(console.error);
+    if (video.readyState >= 1) {
+      video.play().catch(console.error);
+    }
   } else {
     video.onloadedmetadata = () => playVideoElement(video);
+    if (video.readyState >= 1) {
+      playVideoElement(video);
+    }
   }
 
   // ✅ Indikator online — titik hijau kanan atas
@@ -1262,10 +1270,10 @@ function addVideo(stream, local = false, peerId = null) {
   // ✅ Status fokus AI — di atas nama
   const status = document.createElement('div');
   status.className = 'status';
-  
+
   const initialStatus = local ? 'Calibrating...' : (peerStatuses[peerId] || 'Detecting...');
   status.innerText = initialStatus;
-  
+
   if (!local && peerId) {
     status.id = 'status-' + peerId;
     if (initialStatus === 'Memperhatikan') {
@@ -1527,6 +1535,9 @@ function initFocus(video, status) {
           vGazeHistory = [];
           earHistory = [];
         }
+      } else {
+        status.innerHTML = 'Calibrating...';
+        status.style.color = '#fbbc04';
       }
       return;
     }
@@ -1688,7 +1699,10 @@ function initFocus(video, status) {
   async function processVideo() {
     try {
       const track = localStream?.getVideoTracks()[0];
-      if (track?.enabled && video.readyState === 4 && video.videoWidth > 0) {
+      if (track?.enabled && video.readyState >= 2 && video.videoWidth > 0) {
+        if (video.paused) {
+          video.play().catch(() => { });
+        }
         const now = Date.now();
         if (now - lastProcessedTime >= currentProcessInterval) {
           lastProcessedTime = now;
@@ -1836,10 +1850,10 @@ async function getCameraDevices() {
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const videoDevices = devices.filter(d => d.kind === 'videoinput');
-    
+
     const select = document.getElementById('cameraSelect');
     if (!select) return;
-    
+
     select.innerHTML = '';
     videoDevices.forEach(d => {
       const opt = document.createElement('option');
@@ -1878,14 +1892,14 @@ async function getCameraDevices() {
 
 async function switchCamera(deviceId) {
   if (!localStream) return;
-  
+
   // 1. Dapatkan dan HENTIKAN track kamera lama terlebih dahulu untuk membebaskan hardware lock
   const oldVideoTrack = localStream.getVideoTracks()[0];
   if (oldVideoTrack) {
     oldVideoTrack.stop();
     localStream.removeTrack(oldVideoTrack);
   }
-  
+
   try {
     // 2. Minta akses kamera yang baru
     const newStream = await navigator.mediaDevices.getUserMedia({
@@ -1896,10 +1910,10 @@ async function switchCamera(deviceId) {
         frameRate: { ideal: 15, max: 20 }
       }
     });
-    
+
     const newVideoTrack = newStream.getVideoTracks()[0];
     localStream.addTrack(newVideoTrack);
-    
+
     // Perbarui sumber video box lokal di DOM
     const localBox = allVideoBoxes.find(b => b.id === 'local')?.element;
     if (localBox) {
@@ -1910,7 +1924,7 @@ async function switchCamera(deviceId) {
         vid.play().catch(console.error);
       }
     }
-    
+
     // Perbarui track pada semua peer connection yang aktif
     if (!screenStream) {
       for (let id in peers) {
@@ -1922,29 +1936,29 @@ async function switchCamera(deviceId) {
         }
       }
     }
-    
+
     // Pastikan tombol kamera sinkron dalam keadaan aktif
     const isCamOn = newVideoTrack.enabled;
     camBtn.querySelector('i').className = isCamOn ? 'fas fa-video' : 'fas fa-video-slash';
     camBtn.classList.toggle('off', !isCamOn);
-    
+
     // Kirim pembaruan status media ke server
     socket.emit('media-status', {
       mic: localStream.getAudioTracks()[0]?.enabled,
       cam: isCamOn
     });
     updateLocalResolution();
-    
+
   } catch (err) {
     console.error("Gagal beralih kamera:", err);
     alert("Gagal mengakses kamera yang dipilih: " + err.message);
-    
+
     // Fallback: Jika gagal beralih, kembalikan ke kamera default agar tidak blank
     try {
       const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true });
       const fallbackTrack = fallbackStream.getVideoTracks()[0];
       localStream.addTrack(fallbackTrack);
-      
+
       const localBox = allVideoBoxes.find(b => b.id === 'local')?.element;
       if (localBox) {
         const vid = localBox.querySelector('video');
@@ -1995,7 +2009,7 @@ function cleanupPeers() {
 function recreatePeer(id) {
   console.log(`[reconnect] Initiating peer recreation for: ${id}`);
   if (peers[id]) {
-    try { peers[id].pc.close(); } catch (e) {}
+    try { peers[id].pc.close(); } catch (e) { }
     delete peers[id];
   }
   socket.emit('recreate-peer', { to: id });
@@ -2007,10 +2021,10 @@ function joinSession() {
     console.log("[reconnect] Cannot join session yet (socket connected:", socket.connected, ", localStream ready:", !!localStream, ")");
     return;
   }
-  
+
   console.log("[reconnect] Joining session. socket.id:", socket.id);
   cleanupPeers();
-  
+
   socket.emit('join-room', { room, name, role, userId });
   socket.emit('set-name', { name, role, userId });
   socket.emit('media-status', {

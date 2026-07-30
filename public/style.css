@@ -3,7 +3,7 @@
 }
 
 body {
-    background: #202124;
+    background: #101010;
     color: white;
     font-family: 'Segoe UI', Roboto, Arial, sans-serif;
     margin: 0;
@@ -587,7 +587,7 @@ video {
     left: 0;
     right: 0;
     height: 80px;
-    background: #202124;
+    background: #101010;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -615,19 +615,19 @@ video {
 }
 
 .control-btn.off {
-    background: #ea4335;
-    border-color: #ea4335;
+    background: #ed1505;
+    border-color: #ed1505;
 }
 
 .leave-btn {
-    background: #ea4335;
+    background: #ed1505;
     border: none;
     width: 75px;
     border-radius: 28px;
 }
 
 .leave-btn:hover {
-    background: #d93025;
+    background: #b10c00;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
@@ -735,7 +735,7 @@ video {
     position: fixed;
     bottom: 20px;
     right: 20px;
-    background: rgba(234, 67, 53, 0.9);
+    background: rgba(255, 21, 0, 0.9);
     color: white;
     padding: 12px 20px;
     border-radius: 8px;
@@ -958,7 +958,7 @@ video {
 .participant-status {
     display: flex;
     gap: 8px;
-    color: #ea4335;
+    color: #ed1505;
     /* default red for off */
 }
 
@@ -1283,4 +1283,23 @@ body.sidebar-open #controls {
 .camera-select-dropdown option {
     background: #202124;
     color: #e8eaed;
+}
+
+.info-icon-btn {
+    width: 18px;
+    height: 18px;
+    margin-left: 8px;
+    cursor: pointer;
+    vertical-align: middle;
+    opacity: 0.85;
+    transition: opacity 0.2s ease, transform 0.2s ease, filter 0.2s ease;
+}
+
+.info-icon-btn:hover {
+    opacity: 1;
+    transform: scale(1.18);
+}
+
+.info-icon-btn:active {
+    transform: scale(0.95);
 }
