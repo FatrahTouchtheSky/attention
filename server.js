@@ -381,10 +381,14 @@ app.get('/room-summary', (req, res) => {
       finalFocusedTime += elapsed;
     }
     
+    // Ensure focused time never exceeds total time
+    finalFocusedTime = Math.min(finalTotalTime, finalFocusedTime);
+
     summaryData[socketId] = {
       name: stats.name,
       total: finalTotalTime,
-      focused: finalFocusedTime
+      focused: finalFocusedTime,
+      lastStatus: stats.lastStatus || 'Detecting...'
     };
   }
 

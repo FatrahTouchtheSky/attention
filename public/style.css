@@ -539,7 +539,13 @@ body {
     width: min(calc(33.333% - 10px), calc((100dvh - 170px) / 3 * 4 / 3));
 }
 
-/* Pagination Buttons */
+#videos.layout-10 .video-container,
+#videos.layout-11 .video-container,
+#videos.layout-12 .video-container {
+    width: min(calc(25% - 11.25px), calc((100dvh - 170px) / 3 * 4 / 3));
+}
+
+/* Pagination Buttons & Indicator */
 .page-btn {
     position: absolute;
     top: 50%;
@@ -562,6 +568,24 @@ body {
 
 .page-btn:hover {
     background: rgba(60, 64, 67, 0.8);
+}
+
+.page-indicator {
+    position: absolute;
+    bottom: 95px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(32, 33, 36, 0.75);
+    backdrop-filter: blur(8px);
+    color: #e8eaed;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 20px;
+    z-index: 50;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
 }
 
 #prevPageBtn {

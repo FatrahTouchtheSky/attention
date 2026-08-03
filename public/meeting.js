@@ -17,6 +17,7 @@ if (!userId) {
   userId = Math.random().toString(36).substring(2, 15);
   sessionStorage.setItem('meeting_userId', userId);
 }
+let currentLocalFocusStatus = 'Calibrating...';
 
 // 3. Jika nama atau room tidak ada, arahkan ke lobby
 if (!name || !room) {
@@ -239,11 +240,11 @@ if (closeSummarySidebarBtn) {
 const downloadSummaryBtn = document.getElementById('downloadSummaryBtn');
 if (downloadSummaryBtn) {
   downloadSummaryBtn.onclick = () => {
-    let csvContent = "data:text/csv;charset=utf-8,Participant Name,Focus Level,Status\n";
+    let csvContent = "data:text/csv;charset=utf-8,Participant Name,Focus Level & Duration,Status\n";
     const items = document.querySelectorAll('#summaryList .participant-item');
     items.forEach(item => {
       const name = item.querySelector('.participant-name').innerText.replace(/,/g, ' ');
-      const focus = item.querySelector('.participant-role').innerText;
+      const focus = item.querySelector('.participant-role').innerText.replace(/,/g, ' ');
       const status = item.querySelector('.participant-status').innerText;
       csvContent += `"${name}","${focus}","${status}"\n`;
     });
@@ -467,6 +468,17 @@ if (participantsBtnMenu) {
   };
 }
 
+function formatTimeDuration(ms) {
+  if (!ms || ms <= 0) return '0s';
+  const totalSecs = Math.floor(ms / 1000);
+  const mins = Math.floor(totalSecs / 60);
+  const secs = totalSecs % 60;
+  if (mins > 0) {
+    return `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
+  }
+  return `${secs}s`;
+}
+
 // Summary Sidebar Logic
 if (role === 'moderator' && summaryBtnMenu) {
   summaryBtnMenu.style.display = 'flex';
@@ -488,14 +500,28 @@ if (role === 'moderator' && summaryBtnMenu) {
 
         for (const peerId in stats) {
           const userStat = stats[peerId];
-          const focusPercent = userStat.total > 0 ? Math.round((userStat.focused / userStat.total) * 100) : 0;
+          const rawPercent = userStat.total > 0 ? (userStat.focused / userStat.total) * 100 : 0;
+          const focusPercent = Math.min(100, Math.max(0, Math.round(rawPercent)));
           const item = document.createElement('div');
           item.className = 'participant-item';
 
+          const focusedFormatted = formatTimeDuration(userStat.focused);
+          const totalFormatted = formatTimeDuration(userStat.total);
+
           let color = '#ea4335';
           let statusText = 'Kurang';
-          if (focusPercent >= 80) { color = '#34a853'; statusText = 'Baik'; }
-          else if (focusPercent >= 50) { color = '#fbbc04'; statusText = 'Cukup'; }
+
+          // Human-friendly threshold rules & minimum stabilizing window (< 10s)
+          if (userStat.total < 10000) {
+            color = '#9ca3af';
+            statusText = 'Mendeteksi...';
+          } else if (focusPercent >= 70) {
+            color = '#34a853';
+            statusText = 'Baik';
+          } else if (focusPercent >= 40) {
+            color = '#fbbc04';
+            statusText = 'Cukup';
+          }
 
           const initial = (userStat.name || '?').charAt(0).toUpperCase();
 
@@ -503,7 +529,7 @@ if (role === 'moderator' && summaryBtnMenu) {
             <div class="participant-avatar">${initial}</div>
             <div class="participant-info">
                 <div class="participant-name">${userStat.name || 'Unknown'}</div>
-                <div class="participant-role">Focus Level: ${focusPercent}%</div>
+                <div class="participant-role">Focus Level: ${userStat.total < 10000 ? 'Mendeteksi...' : focusPercent + '%'} (${focusedFormatted} / ${totalFormatted})</div>
             </div>
             <div class="participant-status" style="color: ${color}; font-weight: 600;">
                 ${statusText}
@@ -743,6 +769,7 @@ async function initMedia() {
         try { peers[id].pc.close(); } catch (e) { }
         delete peers[id];
       }
+      updateAllSendersBitrate();
       delete peerStreamType[id];
       const leftName = peerNames[id] || 'Peserta';
       delete peerNames[id];
@@ -995,6 +1022,14 @@ function startSpeakerDetection() {
 /* =================================================
    BANDWIDTH LIMITATION (NETWORK EFFICIENCY)
 ================================================= */
+function updateAllSendersBitrate() {
+  for (const id in peers) {
+    if (peers[id] && peers[id].pc) {
+      limitVideoSenderBitrate(peers[id].pc);
+    }
+  }
+}
+
 function limitVideoSenderBitrate(pc) {
   const senders = pc.getSenders();
   const videoSender = senders.find(s => s.track && s.track.kind === 'video');
@@ -1006,10 +1041,24 @@ function limitVideoSenderBitrate(pc) {
       }
       if (parameters.encodings[0]) {
         const isScreen = screenStream && screenStream.getVideoTracks().includes(videoSender.track);
-        const maxBitrate = isScreen ? 1500000 : 300000;
+        let maxBitrate = 300000;
+        if (isScreen) {
+          maxBitrate = 1500000;
+        } else {
+          const peerCount = Object.keys(peers).length;
+          if (peerCount > 18) {
+            maxBitrate = 100000; // 100 kbps per stream for 20-30+ participants
+          } else if (peerCount > 12) {
+            maxBitrate = 150000; // 150 kbps
+          } else if (peerCount > 5) {
+            maxBitrate = 200000; // 200 kbps
+          } else {
+            maxBitrate = 300000; // 300 kbps
+          }
+        }
         parameters.encodings[0].maxBitrate = maxBitrate;
         videoSender.setParameters(parameters)
-          .then(() => console.log(`[bitrate-limiter] Bitrate limit set to ${maxBitrate} Bps for peer.`))
+          .then(() => console.log(`[bitrate-limiter] Bitrate limit set to ${maxBitrate} Bps for peer (${Object.keys(peers).length} peers).`))
           .catch(err => console.warn("[bitrate-limiter] setParameters error:", err));
       }
     } catch (err) {
@@ -1159,6 +1208,7 @@ function createPeer(id, polite) {
   if (audioTrack) pc.addTrack(audioTrack, localStream);
 
   peers[id] = { pc, polite, getMakingOffer: () => makingOffer, candidatesQueue: [], timeout: connectionTimeout };
+  updateAllSendersBitrate();
   return peers[id];
 }
 
@@ -1213,6 +1263,28 @@ async function handleSignal(from, signal) {
     }
   } catch (e) {
     console.error('[signal]', e.message, pc.signalingState);
+  }
+}
+
+/* =================================================
+   PLAY VIDEO / AUDIO HELPER
+================================================= */
+function playVideoElement(el) {
+  if (!el) return;
+  const promise = el.play();
+  if (promise !== undefined) {
+    promise.catch(err => {
+      console.warn("[media] Autoplay prevented or error playing video/audio element:", err);
+      const resumePlay = () => {
+        el.play().catch(e => console.error("[media] Retry play error:", e));
+        document.removeEventListener('click', resumePlay);
+        document.removeEventListener('keydown', resumePlay);
+        document.removeEventListener('touchstart', resumePlay);
+      };
+      document.addEventListener('click', resumePlay, { once: true });
+      document.addEventListener('keydown', resumePlay, { once: true });
+      document.addEventListener('touchstart', resumePlay, { once: true });
+    });
   }
 }
 
@@ -1301,7 +1373,8 @@ function addVideo(stream, local = false, peerId = null) {
 function updatePagination() {
   const prevBtn = document.getElementById('prevPageBtn');
   const nextBtn = document.getElementById('nextPageBtn');
-  const itemsPerPage = window.innerWidth <= 768 ? 6 : 9;
+  const pageIndicator = document.getElementById('pageIndicator');
+  const itemsPerPage = window.innerWidth <= 768 ? 6 : 12;
 
   const isSharing = document.body.classList.contains('sharing-active');
   const presentationBox = document.getElementById('presentationBox');
@@ -1312,6 +1385,14 @@ function updatePagination() {
   }
 
   if (currentPage > totalPages) currentPage = totalPages;
+
+  allVideoBoxes.forEach((b, index) => {
+    // Ensure all remote audio tracks continue playing regardless of current pagination page
+    const vid = b.element.querySelector('video');
+    if (vid && vid.paused) {
+      playVideoElement(vid);
+    }
+  });
 
   if (isSharing) {
     if (currentPage === 1) {
@@ -1351,9 +1432,14 @@ function updatePagination() {
   if (totalPages > 1) {
     if (prevBtn) prevBtn.style.display = currentPage > 1 ? 'flex' : 'none';
     if (nextBtn) nextBtn.style.display = currentPage < totalPages ? 'flex' : 'none';
+    if (pageIndicator) {
+      pageIndicator.style.display = 'inline-block';
+      pageIndicator.innerText = `Halaman ${currentPage} / ${totalPages}`;
+    }
   } else {
     if (prevBtn) prevBtn.style.display = 'none';
     if (nextBtn) nextBtn.style.display = 'none';
+    if (pageIndicator) pageIndicator.style.display = 'none';
   }
 
   const valParticipants = document.getElementById('valParticipants');
@@ -1366,7 +1452,7 @@ document.getElementById('prevPageBtn')?.addEventListener('click', () => {
   if (currentPage > 1) { currentPage--; updatePagination(); }
 });
 document.getElementById('nextPageBtn')?.addEventListener('click', () => {
-  const itemsPerPage = window.innerWidth <= 768 ? 6 : 9;
+  const itemsPerPage = window.innerWidth <= 768 ? 6 : 12;
   let totalPages = Math.ceil(allVideoBoxes.length / itemsPerPage) || 1;
   if (document.body.classList.contains('sharing-active')) {
     totalPages += 1;
@@ -1474,8 +1560,8 @@ function initFocus(video, status) {
 
   const CALIB_FRAMES = 15; // 1.5 detik kalibrasi (pada 10 FPS)
   const EAR_BLINK_RATIO = 0.75;
-  const GAZE_TOLERANCE = 0.25;
-  const YAW_TOLERANCE = 0.35;
+  const GAZE_TOLERANCE = 0.20;
+  const YAW_TOLERANCE = 0.18; // Ketat & akurat untuk membaca posisi menoleh (geleng/menoleh kepala)
   const PITCH_TOLERANCE = 0.08; // Diperketat agar sensitif terhadap tundukan kepala
   const VERTICAL_GAZE_TOLERANCE = 0.15; // Toleransi untuk bola mata naik/turun
 
@@ -1495,7 +1581,7 @@ function initFocus(video, status) {
   let consecutiveFocusing = 0;
 
   const EYES_CLOSED_FRAMES = 5;  // ~0.5s mata tertutup (mengabaikan kedipan normal)
-  const NOT_FOCUSED_FRAMES = 8;  // ~0.8s tidak fokus/melihat ke arah lain
+  const NOT_FOCUSED_FRAMES = 4;  // ~0.4s responsif dalam mendeteksi posisi menoleh / tidak fokus
   const NO_FACE_FRAMES = 5;      // ~0.5s tidak ada wajah terdeteksi
   const FOCUSING_FRAMES = 2;      // ~0.2s kembali fokus untuk memulihkan status
 
@@ -1615,6 +1701,7 @@ function initFocus(video, status) {
         gazeHistory = [];
         vGazeHistory = [];
         earHistory = [];
+        safeUpdateStatus('Memperhatikan', '#81c995');
       }
       return;
     }
@@ -2031,8 +2118,22 @@ function joinSession() {
     mic: localStream.getAudioTracks()[0]?.enabled,
     cam: localStream.getVideoTracks()[0]?.enabled
   });
+  if (currentLocalFocusStatus && currentLocalFocusStatus !== 'Calibrating...') {
+    socket.emit('update-focus', { status: currentLocalFocusStatus, name });
+  }
   if (screenStream) {
     socket.emit('screen-share-start');
+  }
+}
+
+function updateAndBroadcastStatus(el, text, color) {
+  currentLocalFocusStatus = text;
+  if (el) {
+    el.innerHTML = text;
+    el.style.color = color;
+  }
+  if (typeof socket !== 'undefined' && socket && socket.connected) {
+    socket.emit('update-focus', { status: text, name });
   }
 }
 
